@@ -162,7 +162,7 @@ ApplicationWindow {
                     TextEdit {
                         objectName: "githubAddress"
                         Layout.fillWidth: true; Layout.minimumWidth: 0
-                        text: "github.com/YSJohnson/UnipusAI-Helper"
+                        text: "github.com/jason195421/UnipusAI-Helper"
                         readOnly: true; selectByMouse: true; textFormat: TextEdit.PlainText
                         wrapMode: TextEdit.Wrap
                         font.family: Theme.fontFamily; font.pixelSize: 13; font.weight: Font.Normal

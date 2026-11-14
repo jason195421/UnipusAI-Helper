@@ -67,7 +67,7 @@ UnipusAI-Helper/
 ## 使用方法
 
 ```powershell
-git clone https://github.com/YSJohnson/UnipusAI-Helper.git
+git clone https://github.com/jason195421/UnipusAI-Helper.git
 cd UnipusAI-Helper
 py -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -542,6 +542,7 @@ Windows 端除了配置编辑器多一个最小化按钮，其余行为与 v3.9.
 ## Star⭐ 对你有帮助欢迎点个Star
 
 [![Star History Chart](https://api.star-history.com/svg?repos=YSJohnson/UnipusAI-Helper&type=Date)](https://www.star-history.com/#YSJohnson/UnipusAI-Helper&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=jason195421/UnipusAI-Helper&type=Date)](https://www.star-history.com/#jason195421/UnipusAI-Helper&Date)
 
 ---
 
