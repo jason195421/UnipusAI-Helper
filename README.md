@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">  
-  <img alt="Version" src="https://img.shields.io/badge/version-3.9.9-2561C7">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.9.10-2561C7">
   <img alt="GUI" src="https://img.shields.io/badge/gui-Qt_Quick-2561C7">
   <img alt="Browser" src="https://img.shields.io/badge/browser-Selenium-43B02A">
   <img alt="AI" src="https://img.shields.io/badge/api-OpenAI%20Compatible-111111">
@@ -27,7 +27,9 @@
 - **桌面工作台**：集中查看课程进度、任务列表和运行日志，内置「设置」页可随时修改配置。
 - **平台自适应界面**：Windows 采用 WinUI 3 / Fluent 风格（Mica 渐变、圆角、系统强调色、浅/深色跟随系统），macOS 采用原生 Aqua 风格，一套 Qt Quick 界面按平台自动切换。
 - **内置 FFmpeg**：语音识别所需的 `ffmpeg` / `ffprobe` 随程序打包，启动时自动加入 PATH，无需联网下载或手工安装。
-- **macOS 应用构建**：通过 GitHub Actions 自动打包 Apple Silicon / Intel 两个 `.app`，配置与日志写入 `~/Library/Application Support/UnipusAI-Helper/`，保持应用包只读。
+- **双版本构建**：每个平台都提供 **release**（纯 GUI、无终端窗口）与 **debug**（保留控制台输出便于排错）两种构建，由 `UNIPUS_BUILD_MODE` 一键切换；release 版启动时自动把标准输出/错误重定向到日志文件，致命错误改为系统弹窗。
+- **安装包发布**：Windows 用 Inno Setup 生成 `Setup.exe`（用户级安装到 `%LOCALAPPDATA%`，无需管理员）并附便携 zip；macOS 用 `hdiutil` 生成 `.dmg`（release 为可拖入「应用程序」的 `.app`，debug 附带 `Run-Debug.command`）。
+- **双平台自动构建**：`.github/workflows/build-windows.yml` 与 `build-macos.yml` 在 `windows-2022` / `macos-15`（arm64）/ `macos-15-intel`（x64）上按 debug × release 矩阵构建，打 `v*` 标签时发布到 GitHub Release；macOS 配置与日志写入 `~/Library/Application Support/UnipusAI-Helper/`，保持应用包只读。
 
 ---
 
@@ -57,14 +59,28 @@ UnipusAI-Helper/
 │   ├── platform_theme.py     # 平台 / 明暗 / 强调色检测（注入 QML）
 │   └── qml/                  # 原生界面组件、主题与图标
 ├── ffmpeg/                    # 内置 FFmpeg 二进制（脚本下载生成，不提交）
-├── scripts/                   # 启动脚本与 fetch_ffmpeg.py 下载脚本
-├── .github/workflows/         # GitHub Actions：macOS .app 自动构建
+├── scripts/                   # fetch_ffmpeg.py / build_variant.py / smoke_test.py 等
+├── installer/                 # Inno Setup 脚本与生成的安装包（不提交）
+├── .github/workflows/         # GitHub Actions：Windows / macOS 双平台 debug+release 构建
 ├── docs/                      # 工作台说明与截图
 ├── logs/                      # 本地运行日志（不提交）
 └── config-backups/            # 本地配置备份（不提交）
 ```
 
 ## 使用方法
+
+**方式一：下载安装包（推荐，无需 Python 环境）**
+
+前往 [Releases](https://github.com/jason195421/UnipusAI-Helper/releases) 下载对应版本：
+
+- Windows：`UnipusAI-Helper-Setup-<版本>-win-x64-<mode>.exe`（安装到 `%LOCALAPPDATA%\UnipusAI-Helper`，
+  带开始菜单/桌面快捷方式），或 `UnipusAI-Helper-<版本>-win-x64-<mode>.zip` 便携解压即用。
+- macOS：`UnipusAI-Helper-macOS-<arch>-<mode>.dmg`，详见下方「macOS」一节。
+
+`<mode>` 为 `release`（推荐，纯 GUI 无终端）或 `debug`（保留控制台日志）；
+两种版本使用不同的安装标识，可并存安装。
+
+**方式二：从源码运行**
 
 ```powershell
 git clone https://github.com/jason195421/UnipusAI-Helper.git
@@ -82,12 +98,15 @@ py -m venv .venv
 
 ### macOS
 
-**方式一：直接下载打包好的 `.app`（推荐）**
+**方式一：直接下载打包好的 `.dmg`（推荐）**
 
-项目的 GitHub Actions（`.github/workflows/build-macos.yml`）会在打 `v*` 标签时自动构建
-Apple Silicon（arm64）与 Intel（x64）两个版本，产物为 `UnipusAI-Helper-macOS-<arch>.zip`。
-下载解压后把 `UnipusAI-Helper.app` 拖进「应用程序」；首次打开若提示「已损坏」或
-「无法验证开发者」，在终端执行一次 `xattr -cr /Applications/UnipusAI-Helper.app` 即可。
+项目的 GitHub Actions（`.github/workflows/build-macos.yml`）会在打 `v*` 标签时按
+`macos-15`（arm64）/ `macos-15-intel`（x64）× `release` / `debug` 构建四个
+`UnipusAI-Helper-macOS-<arch>-<mode>.dmg`。release 版打开 DMG 后把
+`UnipusAI-Helper.app` 拖进「应用程序」即可，双击启动**不显示终端窗口**；
+debug 版是一个普通文件夹加 `Run-Debug.command`，双击 `.command` 从终端启动以保留日志。
+首次打开若提示「已损坏」或「无法验证开发者」，在终端执行一次
+`xattr -cr /Applications/UnipusAI-Helper.app` 即可（清除未签名构建的隔离属性）。
 FFmpeg 已内置在应用包里，语音识别无需另装；配置、日志写到
 `~/Library/Application Support/UnipusAI-Helper/`，应用包本身保持只读。
 
@@ -188,6 +207,30 @@ Aqua 风格；同一套 Qt Quick / QML 界面按平台自动切换配色、圆�
 
 <details>
 <summary><b>点击展开完整更新日志</b></summary>
+
+<details>
+<summary><b>v3.9.10（2026-11-14）</b>：安装包 / debug 与 release 双版本 / 纯 GUI 启动 / 双平台 CI</summary>
+
+- **release / debug 双版本**：`UNIPUS_BUILD_MODE=debug|release` 驱动同一份 `UnipusAI-Helper.spec`；
+  debug 保留控制台（`console=True`，产物名带 `-Debug` 后缀），release 使用 `console=False`
+  纯 GUI 启动并通过 `scripts/gui_runtime_hook.py` 强制 `UNIPUS_GUI=1`。
+- **GUI 无终端适配**：主入口新增 windowed stdio 兜底（`_SafeWriter` / `_NullInput`），
+  把 `None` 的标准流重定向到 `logs/gui-stdout.log` 与 `logs/gui-stderr.log`；致命错误改为
+  系统弹窗（`_gui_fatal`），交互式的环境检查菜单在 GUI 模式下自动跳过，避免无输入卡死。
+  `logging.StreamHandler` 固定指向常驻文件流，避免 `PrintRedirector` 接管 stdout 后递归。
+- **Windows 安装包**：新增 `installer/UnipusAI-Helper.iss`（Inno Setup 6），默认装到
+  `{localappdata}` 且 `PrivilegesRequired=lowest`，用户级无需管理员、目录可写，正好匹配
+  `paths.py` 把 `config.json` / `logs/` 写在 exe 同目录的行为；release/debug 使用不同 AppId。
+  另产出便携 zip。`scripts/build_variant.py` 一键完成 PyInstaller 构建、payload 组装、
+  结构校验、安装包生成；`scripts/smoke_test.py` 做 offscreen 冒烟。
+- **macOS DMG**：`build_variant.py` 用 `hdiutil` 生成 `.dmg`；release 含 ad-hoc 签名的
+  `.app` 与「应用程序」快捷方式，debug 附带 `Run-Debug.command` 从终端启动（macOS 的
+  `console=True` `.app` 会写入 `LSBackgroundOnly` 导致无 Dock / 窗口不显示，故仅 release 做 bundle）。
+- **双平台 GitHub Actions**：新增 `.github/workflows/build-windows.yml`（`windows-2022`，
+  choco 安装 Inno Setup，debug × release 矩阵）；`build-macos.yml` 改为 arm64 / x64 ×
+  debug / release 四组并产出 DMG。两者均在 `v*` 标签时发布到 GitHub Release。
+
+</details>
 
 <details>
 <summary><b>v3.9.9（2026-11-14）</b>：内置 FFmpeg / WinUI 3 与 macOS 自适应界面 / macOS 自动构建</summary>
@@ -541,7 +584,6 @@ Windows 端除了配置编辑器多一个最小化按钮，其余行为与 v3.9.
 
 ## Star⭐ 对你有帮助欢迎点个Star
 
-[![Star History Chart](https://api.star-history.com/svg?repos=YSJohnson/UnipusAI-Helper&type=Date)](https://www.star-history.com/#YSJohnson/UnipusAI-Helper&Date)
 [![Star History Chart](https://api.star-history.com/svg?repos=jason195421/UnipusAI-Helper&type=Date)](https://www.star-history.com/#jason195421/UnipusAI-Helper&Date)
 
 ---
