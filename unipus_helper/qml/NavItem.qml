@@ -12,7 +12,7 @@ Button {
     hoverEnabled: true
     HoverHandler { cursorShape: Qt.PointingHandCursor }
     background: Rectangle {
-        radius: 8
+        radius: Theme.radiusSm
         color: control.selected ? Theme.navigation : control.hovered ? Theme.hover : "transparent"
         border.width: control.activeFocus ? 1 : 0
         border.color: control.activeFocus ? Theme.accent : Theme.line

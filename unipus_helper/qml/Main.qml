@@ -12,6 +12,14 @@ ApplicationWindow {
     visible: true
     title: "UnipusAI-Helper"
     color: Theme.canvas
+    // Mica (Windows) / Aqua (macOS) tinted backdrop: opaque cards float over
+    // the gradient, while page gaps pick up the platform tint.
+    background: Rectangle {
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Theme.windowTop }
+            GradientStop { position: 1.0; color: Theme.windowBottom }
+        }
+    }
     palette.window: Theme.surface
     palette.windowText: Theme.ink
     palette.base: Theme.canvas
@@ -19,7 +27,7 @@ ApplicationWindow {
     palette.button: Theme.raised
     palette.buttonText: Theme.ink
     palette.highlight: Theme.accentFill
-    palette.highlightedText: "white"
+    palette.highlightedText: Theme.accentInk
     readonly property bool setupMode: (typeof settings !== "undefined" && !!settings.setupMode)
     property int currentPage: setupMode ? 2 : 0
     readonly property int pageMargin: width < 1100 ? 20 : 28
@@ -73,8 +81,11 @@ ApplicationWindow {
             Layout.preferredWidth: window.width < 1100 ? 224 : 244
             Layout.minimumWidth: Layout.preferredWidth; Layout.maximumWidth: Layout.preferredWidth
             Layout.fillHeight: true; Layout.minimumHeight: 0
-            color: Theme.sidebar
-            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.line }
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Theme.sidebarTop }
+                GradientStop { position: 1.0; color: Theme.sidebarBottom }
+            }
+            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.line; visible: Theme.sidebarBorder > 0 }
             ColumnLayout {
                 anchors.fill: parent; anchors.margins: 16; spacing: 4
                 RowLayout {
@@ -113,7 +124,7 @@ ApplicationWindow {
                         onClicked: { workbench.chooseUnit(modelData.name); window.currentPage = 0; window.resetTaskPosition() }
                         HoverHandler { cursorShape: Qt.PointingHandCursor }
                         background: Rectangle {
-                            radius: 8; color: unitButton.selected ? Theme.navigation : unitButton.hovered ? Theme.hover : "transparent"
+                            radius: Theme.radiusSm; color: unitButton.selected ? Theme.navigation : unitButton.hovered ? Theme.hover : "transparent"
                             border.width: unitButton.activeFocus ? 1 : 0; border.color: Theme.accent
                         }
                         contentItem: ColumnLayout {
@@ -156,7 +167,7 @@ ApplicationWindow {
                         wrapMode: TextEdit.Wrap
                         font.family: Theme.fontFamily; font.pixelSize: 13; font.weight: Font.Normal
                         font.hintingPreference: Font.PreferFullHinting; renderType: TextEdit.NativeRendering
-                        color: Theme.muted; selectedTextColor: "white"; selectionColor: Theme.accentFill
+                        color: Theme.muted; selectedTextColor: Theme.accentInk; selectionColor: Theme.accentFill
                         Accessible.name: "GitHub 地址：" + text
                     }
                 }
@@ -213,7 +224,7 @@ ApplicationWindow {
             Rectangle {
                 visible: !window.setupMode && (!!window.appState.error || workbench.notice !== "")
                 Layout.fillWidth: true; implicitHeight: noticeText.implicitHeight + 24; Layout.bottomMargin: 12
-                color: Theme.surface; radius: 8; border.color: Theme.line
+                color: Theme.surface; radius: Theme.radiusSm; border.color: Theme.line
                 RowLayout {
                     anchors.fill: parent; anchors.margins: 12; spacing: 12
                     UiText { id: noticeText; text: workbench.notice || window.appState.error || ""; color: window.appState.error ? Theme.error : Theme.secondary; font.pixelSize: 13; wrapMode: Text.Wrap; Layout.fillWidth: true }
@@ -223,7 +234,7 @@ ApplicationWindow {
             Rectangle {
                 objectName: "taskSurface"; visible: window.currentPage === 0
                 Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 0; Layout.minimumWidth: 0
-                color: Theme.surface; radius: 12; border.color: Theme.line
+                color: Theme.surface; radius: Theme.radiusMd; border.color: Theme.line
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 1; spacing: 0
                     Item {
@@ -243,7 +254,7 @@ ApplicationWindow {
                                         onClicked: { workbench.chooseFilter(modelData.key); window.resetTaskPosition() }
                                         HoverHandler { cursorShape: Qt.PointingHandCursor }
                                         Accessible.name: modelData.title
-                                        background: Rectangle { radius: 7; color: filterButton.selected ? Theme.navigation : filterButton.hovered ? Theme.hover : "transparent"; border.width: filterButton.selected || filterButton.activeFocus ? 1 : 0; border.color: filterButton.activeFocus ? Theme.accent : Theme.selectionLine }
+                                        background: Rectangle { radius: Theme.radiusSm; color: filterButton.selected ? Theme.navigation : filterButton.hovered ? Theme.hover : "transparent"; border.width: filterButton.selected || filterButton.activeFocus ? 1 : 0; border.color: filterButton.activeFocus ? Theme.accent : Theme.selectionLine }
                                         contentItem: UiText { id: filterText; text: filterButton.modelData.title + "  " + summary.counts[filterButton.modelData.key]; font.pixelSize: 13; font.weight: filterButton.selected ? Font.DemiBold : Font.Medium; color: filterButton.modelData.key === "required" ? Theme.compulsory : filterButton.selected ? Theme.ink : Theme.secondary; horizontalAlignment: Text.AlignHCenter }
                                     }
                                 }
@@ -261,7 +272,7 @@ ApplicationWindow {
                                 Keys.onReturnPressed: window.focusFirstTask()
                                 Keys.onEnterPressed: window.focusFirstTask()
                                 Keys.onDownPressed: window.focusFirstTask()
-                                background: Rectangle { radius: 7; color: Theme.raised; border.width: 1; border.color: searchInput.activeFocus ? Theme.accent : Theme.line }
+                                background: Rectangle { radius: Theme.radiusSm; color: Theme.raised; border.width: 1; border.color: searchInput.activeFocus ? Theme.accent : Theme.line }
                                 Icon { x: 8; anchors.verticalCenter: parent.verticalCenter; name: "search"; width: 16; height: 16 }
                                 ActionButton { objectName: "clearSearch"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 28; height: 28; leftPadding: 6; rightPadding: 6; visible: searchInput.text !== ""; quiet: true; iconName: "close"; Accessible.name: "清空搜索"; hint: "清空搜索（Esc）"; onClicked: { searchInput.clear(); searchInput.forceActiveFocus() } }
                             }
@@ -317,7 +328,7 @@ ApplicationWindow {
             }
             Rectangle {
                 visible: window.currentPage === 1; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 0
-                color: Theme.surface; radius: 12; border.color: Theme.line
+                color: Theme.surface; radius: Theme.radiusMd; border.color: Theme.line
                 LogView { id: activity; objectName: "allActivity"; anchors.fill: parent; anchors.margins: 12; entries: window.appState.logs || [] }
                 ActionButton {
                     objectName: "latestLogs"; visible: !activity.followTail && !activity.atYEnd && activity.count > 0
@@ -329,11 +340,11 @@ ApplicationWindow {
                 objectName: "taskActions"; visible: window.currentPage === 0 || window.busy
                 Layout.fillWidth: true; Layout.preferredHeight: window.compactHeight ? 64 : 76
                 Layout.topMargin: window.compactHeight ? 12 : 16; Layout.bottomMargin: 16
-                radius: 12; color: Theme.surface; border.color: Theme.subtleLine
+                radius: Theme.radiusMd; color: Theme.surface; border.color: Theme.subtleLine
                 RowLayout {
                     anchors.fill: parent; anchors.leftMargin: 20; anchors.rightMargin: 16; spacing: window.width < 1100 ? 16 : 20
                     Rectangle {
-                        visible: window.width >= 1100; width: 28; height: 28; radius: 6
+                        visible: window.width >= 1100; width: 28; height: 28; radius: Theme.radiusSm
                         color: window.busy ? Theme.navigation : summary.selected > 0 ? Theme.accentFill : Theme.raised
                         Icon { anchors.centerIn: parent; name: window.busy ? "play" : "check"; width: 20; height: 20; white: true; visible: window.busy || summary.selected > 0 }
                     }
@@ -386,7 +397,7 @@ ApplicationWindow {
         anchors.centerIn: parent; width: 456; padding: 24
         header: UiText { text: "处理当前页"; font.pixelSize: 20; font.weight: Font.Medium; padding: 24; bottomPadding: 8 }
         onAccepted: window.startProcessing("quick")
-        background: Rectangle { color: Theme.surface; radius: 16; border.color: Theme.line }
+        background: Rectangle { color: Theme.surface; radius: Theme.radiusLg; border.color: Theme.line }
         ColumnLayout {
             width: parent.width; spacing: 24
             UiText { Layout.fillWidth: true; text: "确认处理浏览器当前打开的题目？"; wrapMode: Text.Wrap; lineHeight: 1.5; color: Theme.secondary }

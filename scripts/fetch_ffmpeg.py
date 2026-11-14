@@ -40,7 +40,9 @@ PACKAGES = {
     "linux-arm64":   (("@ffmpeg-installer/linux-arm64", "4.1.4"),
                       ("@ffprobe-installer/linux-arm64", "5.0.1")),
 }
-EXE = ".exe" if sys.platform == "win32" else ""
+def _exe_suffix(pid: str) -> str:
+    """Binary extension for the *target* platform, not the host running this."""
+    return ".exe" if pid.startswith("win") else ""
 
 
 def tarball_url(registry: str, name: str, version: str) -> str:
@@ -84,22 +86,23 @@ def main() -> int:
         print("Unsupported platform id: " + pid, file=sys.stderr)
         return 1
 
+    exe = _exe_suffix(pid)
     target = ROOT / "ffmpeg" / pid
     target.mkdir(parents=True, exist_ok=True)
-    ffmpeg = target / ("ffmpeg" + EXE)
-    ffprobe = target / ("ffprobe" + EXE)
+    ffmpeg = target / ("ffmpeg" + exe)
+    ffprobe = target / ("ffprobe" + exe)
 
     if not args.force and ffmpeg.is_file() and ffprobe.is_file():
         print("Already present: " + str(target))
         return 0
 
-    for (name, version), binary in zip(PACKAGES[pid], (ffmpeg, ffprobe)):
+    binaries = (("ffmpeg" + exe, ffmpeg), ("ffprobe" + exe, ffprobe))
+    for (name, version), (member, binary) in zip(PACKAGES[pid], binaries):
         url = tarball_url(args.registry, name, version)
         print("Downloading " + name + "@" + version + " -> " + binary.name)
         blob = download(url)
-        wanted = "ffmpeg" + EXE if binary == ffmpeg else "ffprobe" + EXE
-        extract_binary(blob, wanted, binary)
-        if EXE == "":
+        extract_binary(blob, member, binary)
+        if exe == "":
             os.chmod(binary, 0o755)
         print("  " + format(binary.stat().st_size, ",") + " bytes")
 

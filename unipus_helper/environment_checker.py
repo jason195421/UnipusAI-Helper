@@ -8,6 +8,11 @@ import zipfile
 import urllib.request
 from typing import Optional, List
 
+try:
+    from .ffmpeg_runtime import ensure_ffmpeg_on_path, bundled_ffmpeg_dir
+except ImportError:  # 允许把本文件当独立脚本调试
+    from unipus_helper.ffmpeg_runtime import ensure_ffmpeg_on_path, bundled_ffmpeg_dir
+
 
 class EnvironmentChecker:
     """环境检测器"""
@@ -95,6 +100,12 @@ class EnvironmentChecker:
         """检查 FFmpeg 安装和 Path 配置"""
         print("   检查 FFmpeg...")
 
+        # FFmpeg 已随程序内置：把内置目录注入 PATH，让 which / whisper 直接命中。
+        # 若内置文件缺失（例如被手动删除），再回落到系统安装的 FFmpeg。
+        bundled_dir = ensure_ffmpeg_on_path()
+        if bundled_dir:
+            print(f"       使用内置 FFmpeg: {bundled_dir}")
+
         # 方法1：检查系统 PATH 中是否有 ffmpeg
         ffmpeg_in_path = shutil.which("ffmpeg")
         if ffmpeg_in_path:
@@ -177,16 +188,17 @@ class EnvironmentChecker:
         print("=" * 60)
         print("\n请选择操作：")
         print("   [1] 自动下载并安装 Edge 浏览器")
-        print("   [2] 自动下载并安装 FFmpeg（推荐）")
-        print("   [3] 将 FFmpeg 添加到系统 PATH（如已安装）")
-        print("   [4] 手动指定 FFmpeg 路径")
+        print("   [2] 重新下载安装 FFmpeg（内置缺失时的兜底，一般无需）")
+        print("   [3] 将系统 FFmpeg 添加到 PATH（一般无需）")
+        print("   [4] 手动指定 FFmpeg 路径（一般无需）")
         print("   [5] 显示详细帮助后退出")
         print("   [Q] 退出程序")
+        print("\n   提示：FFmpeg 已随程序内置，正常情况下无需联网下载或手动安装。")
         if platform.system() != "Windows":
             print("\n   macOS / Linux 提示：下面 [1][2][3] 是 Windows 专用流程，")
-            print("   建议直接用包管理器安装，装完重跑本程序即可：")
-            print("     macOS   brew install --cask microsoft-edge && brew install ffmpeg")
-            print("     Ubuntu  sudo apt install ffmpeg   # Edge 请去官网下 .deb")
+            print("   Edge 建议用包管理器安装；FFmpeg 已内置，一般无需处理：")
+            print("     macOS   brew install --cask microsoft-edge")
+            print("     Ubuntu  Edge 请去官网下 .deb；apt install ffmpeg 仅作兜底")
 
         choice = input("\n请输入选项 (1/2/3/4/5/Q): ").strip().upper()
         return choice

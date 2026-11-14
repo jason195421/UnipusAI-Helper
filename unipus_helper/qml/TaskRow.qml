@@ -84,7 +84,7 @@ Item {
         Keys.onUpPressed: row.moveFocus(-1)
         Keys.onDownPressed: row.moveFocus(1)
         background: Rectangle {
-            radius: 7
+            radius: Theme.radiusSm
             color: taskControl.down && row.selectable ? Theme.selectionHover : row.chosen ? (taskControl.hovered ? Theme.selectionHover : Theme.selection) : taskControl.hovered ? Theme.raised : "transparent"
             border.width: row.chosen || taskControl.visualFocus ? 1 : 0
             border.color: taskControl.visualFocus ? Theme.accent : Theme.selectionLine
@@ -106,13 +106,13 @@ Item {
             }
             Rectangle {
                 objectName: "requirement_" + row.taskId
-                Layout.preferredWidth: 48; Layout.preferredHeight: 24; radius: 6
+                Layout.preferredWidth: 48; Layout.preferredHeight: 24; radius: Theme.radiusSm
                 color: row.isRequired ? Theme.compulsory : Theme.raised; border.color: row.isRequired ? Theme.compulsory : Theme.line
                 UiText { anchors.centerIn: parent; text: row.isRequired ? "必修" : "选修"; color: row.isRequired ? Theme.requiredInk : Theme.secondary; font.pixelSize: 13 }
             }
             UiText { text: row.scored === false ? "不计分" : row.scored === null ? "待确认" : "计分"; color: Theme.secondary; font.pixelSize: 13; Layout.preferredWidth: 64; horizontalAlignment: Text.AlignHCenter }
             Rectangle {
-                Layout.preferredWidth: 72; Layout.preferredHeight: 24; radius: 6
+                Layout.preferredWidth: 72; Layout.preferredHeight: 24; radius: Theme.radiusSm
                 color: row.status === "done" ? Theme.successSurface : row.status === "doing" ? Theme.navigation : Theme.raised
                 border.width: row.status === "done" ? 0 : 1; border.color: Theme.line
                 UiText {

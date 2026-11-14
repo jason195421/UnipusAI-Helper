@@ -1,0 +1,71 @@
+UnipusAI-Helper v3.9.9 — Windows 可执行版
+==========================================
+
+本版本在 v3.9.8（配置编辑合并进主程序）的基础上：
+  * 内置 FFmpeg / ffprobe，语音识别不再需要联网下载或手工安装；
+  * Windows 界面改为 WinUI 3 / Fluent 风格（Mica 渐变、圆角、系统强调色，
+    浅色/深色跟随系统；macOS 版对应使用原生 Aqua 风格）；
+  * 同一套 Qt Quick / QML 界面按平台自动切换，仍是单一 exe、一个窗口、一个进程。
+
+目录说明
+--------
+  UnipusAI-Helper.exe   主程序（控制台窗口显示运行日志，内置「设置」页）
+  config.json           运行配置（首次已附带空模板）
+  _internal/            程序运行所需的依赖库（请勿删除或改名）
+                        其中 _internal/ffmpeg/win32-x64/ 为内置 FFmpeg 二进制
+
+使用步骤
+--------
+1. 双击 UnipusAI-Helper.exe 启动。
+   首次启动时 config.json 里没有 API Key，程序会自动打开内置「设置」页，
+   不会先启动浏览器，也不会因空密钥报错。
+2. 在「设置」页填写 Unipus 账号、密码、API Key / Base URL / 模型等，点「保存设置」。
+   窗口会自动关闭，按提示重新启动程序即可生效。
+3. 以后随时可以点侧栏「设置」修改配置；保存后重启程序生效。
+   如需跳过环境自检，可在命令行运行：UnipusAI-Helper.exe --skip-check
+4. 语音识别所需的 FFmpeg 已内置，启动时程序会自动把它加入 PATH；
+   环境自检会打印「使用内置 FFmpeg: ...\ffmpeg\win32-x64」。
+   仅当内置文件被误删时，才会提示原有的下载 / 手动指定兜底选项。
+
+运行环境要求
+------------
+  * Windows 10/11 64 位
+  * Microsoft Edge 浏览器（用于 Selenium 自动化）
+  * FFmpeg：已内置，无需额外安装
+  * 网络可访问 Unipus 平台与所配置的 AI API
+  * 首次启动会由 Selenium Manager 自动匹配并下载与 Edge 版本对应的
+    msedgedriver（缓存在 logs/selenium_cache/）；该步骤需要联网。
+    若机器无法访问微软驱动下载站点，可手动把对应版本的 msedgedriver.exe
+    放到下列路径后再启动（版本需与 Edge 主版本号一致，例如 157）：
+      logs/selenium_cache/msedgedriver/win64/<Edge完整版本号>/msedgedriver.exe
+    并设置环境变量 SE_OFFLINE=true 让 Selenium Manager 直接使用缓存、
+    跳过联网查询。
+
+界面主题（可选）
+----------------
+  * 默认自动跟随 Windows 的浅色/深色应用模式与系统强调色。
+  * 可用环境变量覆盖：
+      UNIPUS_THEME=dark|light   强制深色或浅色
+      UNIPUS_ACCENT=#RRGGBB    自定义强调色
+
+注意
+----
+  * config.json、logs/ 均生成在本目录（与 exe 同级），升级时请保留 config.json。
+  * 主程序含 PyTorch / Whisper / PySide6 等大型依赖，首次启动稍慢属正常。
+  * 旧版独立配置编辑器 config_editor.py 仅保留在项目源码中，不再单独发布，
+    也不再随本目录提供。
+
+构建与验证
+----------
+  * 使用 PyInstaller 6.22.3 / Python 3.12.7 打包（spec 见项目根目录的
+    UnipusAI-Helper.spec），按平台收集 ffmpeg/<platform-id>/ 下的二进制。
+  * 已验证：全部依赖导入、内置 FFmpeg 命中 PATH 并可解码音频、环境自检通过、
+    内置设置页 QML 在深/浅两套主题下均可加载、GUI 事件循环正常。
+  * 本机若出现 Selenium Manager 联网失败（无法获取 msedgedriver），
+    属于运行环境网络问题，不是 exe 打包问题；按上节使用缓存驱动即可。
+
+macOS 版本
+----------
+  macOS 版由仓库的 GitHub Actions（.github/workflows/build-macos.yml）在打 v* 标签时
+  自动构建 arm64 / x64 两个 .app，FFmpeg 同样内置；配置与日志位于
+  ~/Library/Application Support/UnipusAI-Helper/，详见 README.md 的「macOS」一节。

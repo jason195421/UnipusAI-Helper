@@ -48,7 +48,7 @@ ListView {
                 text: logRow.modelData.message; color: logRow.tone; font.family: Theme.fontFamily; font.weight: Font.Medium; font.pixelSize: 14
                 font.hintingPreference: Font.PreferFullHinting; renderType: TextEdit.NativeRendering
                 textFormat: TextEdit.PlainText; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap
-                selectedTextColor: "white"; selectionColor: Theme.accentFill
+                selectedTextColor: Theme.accentInk; selectionColor: Theme.accentFill
                 Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignTop
                 Accessible.name: logRow.levelName + "，" + logRow.modelData.message
             }

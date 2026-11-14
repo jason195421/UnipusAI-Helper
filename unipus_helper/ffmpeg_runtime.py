@@ -34,12 +34,26 @@ def platform_id() -> str:
 
 
 def _candidate_roots():
-    """Yield plausible bundle roots, most specific first."""
+    """Yield plausible bundle roots, most specific first.
+
+    On macOS, PyInstaller's BUNDLE relocates DATA files into
+    Contents/Resources (cross-linked into Contents/Frameworks) while
+    sys._MEIPASS points at Contents/MacOS.  Cover all three locations so the
+    bundled FFmpeg is found regardless of the exact PyInstaller version.
+    """
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
         yield Path(meipass)
     if getattr(sys, "frozen", False):
-        yield Path(sys.executable).resolve().parent
+        exe = Path(sys.executable).resolve()
+        yield exe.parent
+        if sys.platform == "darwin":
+            for parent in exe.parents:
+                if parent.name == "Contents":
+                    yield parent / "Resources"
+                    yield parent / "Frameworks"
+                    yield parent / "MacOS"
+                    break
     yield PROJECT_ROOT
 
 
@@ -51,6 +65,42 @@ def bundled_ffmpeg_dir() -> Path | None:
         if (candidate / ("ffmpeg" + _EXE)).is_file():
             return candidate
     return None
+
+
+def _ensure_executable(directory: Path) -> bool:
+    """Make sure the bundled ffmpeg/ffprobe are executable; True on success."""
+    for name in ("ffmpeg", "ffprobe"):
+        binary = directory / name
+        try:
+            mode = binary.stat().st_mode
+            if not (mode & 0o111):
+                binary.chmod(mode | 0o755)
+            if not os.access(str(binary), os.X_OK):
+                return False
+        except OSError:
+            return False
+    return True
+
+
+def _writable_copy(directory: Path) -> Path | None:
+    """Copy the bundled binaries into a writable temp dir and chmod them."""
+    import shutil
+    import tempfile
+
+    fallback = Path(tempfile.gettempdir()) / ("unipus_ffmpeg_" + platform_id())
+    try:
+        fallback.mkdir(parents=True, exist_ok=True)
+        for name in ("ffmpeg", "ffprobe"):
+            source = directory / name
+            if not source.is_file():
+                return None
+            target = fallback / name
+            if not target.is_file() or target.stat().st_size != source.stat().st_size:
+                shutil.copyfile(source, target)
+            target.chmod(0o755)
+        return fallback
+    except OSError:
+        return None
 
 
 def ensure_ffmpeg_on_path() -> Path | None:
@@ -65,16 +115,12 @@ def ensure_ffmpeg_on_path() -> Path | None:
         return None
 
     # npm tarballs do not preserve the executable bit on Unix; repair it so a
-    # freshly unpacked macOS/Linux bundle works without a manual chmod.
+    # freshly unpacked macOS/Linux bundle works without a manual chmod.  A
+    # signed .app is read-only, so if the bit cannot be set (or the binary is
+    # still not executable), fall back to a writable copy in the temp dir.
     if _EXE == "":
-        for name in ("ffmpeg", "ffprobe"):
-            binary = directory / name
-            try:
-                mode = binary.stat().st_mode
-                if not (mode & 0o111):
-                    binary.chmod(mode | 0o755)
-            except OSError:
-                pass
+        if not _ensure_executable(directory):
+            directory = _writable_copy(directory) or directory
 
     resolved = str(directory.resolve())
     current = os.environ.get("PATH", "")

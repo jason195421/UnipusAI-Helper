@@ -6,7 +6,7 @@ Rectangle {
     property var counts: ({ all: 0, done: 0, pending: 0 })
     readonly property real completion: counts.all > 0 ? counts.done / counts.all : 0
     property bool compact: false
-    color: Theme.surface; radius: 12; border.color: Theme.line
+    color: Theme.surface; radius: Theme.radiusMd; border.color: Theme.line
     implicitHeight: compact ? 64 : 72
     RowLayout {
         anchors.fill: parent; anchors.leftMargin: overview.compact ? 16 : 24; anchors.rightMargin: overview.compact ? 16 : 24

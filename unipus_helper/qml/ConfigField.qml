@@ -18,7 +18,7 @@ TextField {
     leftPadding: 12
     rightPadding: 12
     background: Rectangle {
-        radius: 7
+        radius: Theme.radiusSm
         color: Theme.raised
         border.width: 1
         border.color: fieldControl.activeFocus ? Theme.accent : Theme.line

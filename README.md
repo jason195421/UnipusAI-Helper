@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">  
-  <img alt="Version" src="https://img.shields.io/badge/version-3.9.8-2561C7">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.9.9-2561C7">
   <img alt="GUI" src="https://img.shields.io/badge/gui-Qt_Quick-2561C7">
   <img alt="Browser" src="https://img.shields.io/badge/browser-Selenium-43B02A">
   <img alt="AI" src="https://img.shields.io/badge/api-OpenAI%20Compatible-111111">
@@ -25,6 +25,9 @@
 - **任务筛选**：默认选择未完成必修，支持搜索、状态筛选和排除不计分任务。
 - **断点续跑**：完成一项自动取消勾选，停止后保留剩余选择，方便继续处理。
 - **桌面工作台**：集中查看课程进度、任务列表和运行日志，内置「设置」页可随时修改配置。
+- **平台自适应界面**：Windows 采用 WinUI 3 / Fluent 风格（Mica 渐变、圆角、系统强调色、浅/深色跟随系统），macOS 采用原生 Aqua 风格，一套 Qt Quick 界面按平台自动切换。
+- **内置 FFmpeg**：语音识别所需的 `ffmpeg` / `ffprobe` 随程序打包，启动时自动加入 PATH，无需联网下载或手工安装。
+- **macOS 应用构建**：通过 GitHub Actions 自动打包 Apple Silicon / Intel 两个 `.app`，配置与日志写入 `~/Library/Application Support/UnipusAI-Helper/`，保持应用包只读。
 
 ---
 
@@ -50,11 +53,15 @@ UnipusAI-Helper/
 │   ├── native_ui.py          # Python / QML 桥接
 │   ├── settings.py            # 配置读写与内置设置页桥接
 │   ├── paths.py              # 项目与资源路径
+│   ├── ffmpeg_runtime.py      # 内置 FFmpeg 定位与 PATH 注入
+│   ├── platform_theme.py     # 平台 / 明暗 / 强调色检测（注入 QML）
 │   └── qml/                  # 原生界面组件、主题与图标
-├── scripts/                  # macOS / Linux 辅助脚本
-├── docs/                     # 工作台说明与截图
-├── logs/                     # 本地运行日志（不提交）
-└── config-backups/           # 本地配置备份（不提交）
+├── ffmpeg/                    # 内置 FFmpeg 二进制（脚本下载生成，不提交）
+├── scripts/                   # 启动脚本与 fetch_ffmpeg.py 下载脚本
+├── .github/workflows/         # GitHub Actions：macOS .app 自动构建
+├── docs/                      # 工作台说明与截图
+├── logs/                      # 本地运行日志（不提交）
+└── config-backups/            # 本地配置备份（不提交）
 ```
 
 ## 使用方法
@@ -75,20 +82,33 @@ py -m venv .venv
 
 ### macOS
 
-先装好运行环境，之后用脚本启动即可（脚本会自动检测并初始化 `.venv`）：
+**方式一：直接下载打包好的 `.app`（推荐）**
+
+项目的 GitHub Actions（`.github/workflows/build-macos.yml`）会在打 `v*` 标签时自动构建
+Apple Silicon（arm64）与 Intel（x64）两个版本，产物为 `UnipusAI-Helper-macOS-<arch>.zip`。
+下载解压后把 `UnipusAI-Helper.app` 拖进「应用程序」；首次打开若提示「已损坏」或
+「无法验证开发者」，在终端执行一次 `xattr -cr /Applications/UnipusAI-Helper.app` 即可。
+FFmpeg 已内置在应用包里，语音识别无需另装；配置、日志写到
+`~/Library/Application Support/UnipusAI-Helper/`，应用包本身保持只读。
+
+**方式二：从源码运行**
 
 ```bash
-brew install ffmpeg                     # 语音转写需要
-brew install --cask microsoft-edge      # 程序驱动的是 Edge
+brew install --cask microsoft-edge      # 程序驱动的是 Edge（FFmpeg 已内置）
 
 ./scripts/config.sh                     # 启动主程序（首次自动进入设置页）
 .venv/bin/python UnipusAI_Helper.py      # 启动主程序
 ```
 
-也可以在访达里双击 `scripts/UnipusAI-Helper.command`。首次双击若提示「无法打开」，右键 →「打开」，
-或在终端补一下执行权限：`chmod +x scripts/config.sh scripts/UnipusAI-Helper.command`。
+脚本会自动检测并初始化 `.venv`、安装依赖；源码模式下如需内置 FFmpeg，先运行一次
+`python scripts/fetch_ffmpeg.py --platform darwin-arm64`（Intel 用 `darwin-x64`），
+不运行则回退使用系统 `ffmpeg`。也可以在访达里双击 `scripts/UnipusAI-Helper.command`。
+首次双击若提示「无法打开」，右键 →「打开」，或在终端补一下执行权限：
+`chmod +x scripts/config.sh scripts/UnipusAI-Helper.command`。
 
-原生工作台保留系统标题栏与窗口操作；Windows 使用系统边框，macOS 使用系统红绿灯。
+原生工作台保留系统标题栏与窗口操作：Windows 使用系统边框并采用 WinUI 3 / Fluent
+风格（Mica 渐变、圆角、系统强调色、浅/深色跟随系统），macOS 使用系统红绿灯与原生
+Aqua 风格；同一套 Qt Quick / QML 界面按平台自动切换配色、圆角与字体。
 
 ---
 
@@ -168,6 +188,29 @@ brew install --cask microsoft-edge      # 程序驱动的是 Edge
 
 <details>
 <summary><b>点击展开完整更新日志</b></summary>
+
+<details>
+<summary><b>v3.9.9（2026-11-14）</b>：内置 FFmpeg / WinUI 3 与 macOS 自适应界面 / macOS 自动构建</summary>
+
+- **内置 FFmpeg**：`ffmpeg` / `ffprobe` 随程序打包（`ffmpeg/<platform>/`），启动时由
+  `unipus_helper/ffmpeg_runtime.py` 自动把内置目录注入 `PATH`，Whisper 与环境自检直接命中，
+  不再需要联网下载、手工安装或 `brew install ffmpeg`；环境检查菜单与首次运行提示同步改为
+  「已内置」，仍保留下载 / 手动指定作为内置被误删时的兜底。
+- **平台自适应界面**：新增 `unipus_helper/platform_theme.py`，从注册表 / `defaults` /
+  GTK 读取系统明暗与强调色并注入 QML 单例；`qml/Theme.qml` 按平台切换 WinUI 3（Fluent）
+  或 macOS（Aqua）配色、圆角（新增 `radiusXs/Sm/Md/Lg`）、Mica / Aqua 窗口渐变、
+  侧栏分隔线与 `accentInk`，并补齐浅色主题图标。支持 `UNIPUS_THEME=dark|light`、
+  `UNIPUS_ACCENT=#RRGGBB` 覆盖。
+- **平台化打包**：`UnipusAI-Helper.spec` 按平台收集对应 FFmpeg 二进制，仅 Windows 收集
+  `winreg` / `winsound`；`winsound` 在 macOS 改用 `osascript beep`，非 Windows 不再报错。
+- **macOS 自动构建**：新增 `.github/workflows/build-macos.yml`，在 `macos-15`（arm64）与
+  `macos-15-intel`（x64）上分别下载对应 FFmpeg、用 PyInstaller 生成 `.app`、ad-hoc 签名
+  并用 `ditto` 打成 zip，打 `v*` 标签时发布到 Release。`.app` 的 `PROJECT_ROOT` 指向
+  `~/Library/Application Support/UnipusAI-Helper/`，配置与日志不再写进只读的应用包；
+  `ffmpeg_runtime` 同时覆盖 `.app` 的 `Contents/Resources` / `Contents/Frameworks`，
+  签名后二进制不可写时自动复制到临时目录执行。
+
+</details>
 
 <details>
 <summary><b>v3.9.8（2026-11-14）</b>：配置编辑合并进主程序 / 单一可执行程序</summary>

@@ -25,3 +25,6 @@ output/
 /.tmp/
 pip-*/
 unipus-workbench-*/
+# 内置 FFmpeg 二进制（由 scripts/fetch_ffmpeg.py 下载生成，体积大不进版本库；只保留说明）
+ffmpeg/*
+!ffmpeg/README.md

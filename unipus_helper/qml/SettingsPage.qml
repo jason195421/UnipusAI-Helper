@@ -9,7 +9,7 @@ Rectangle {
     objectName: "settingsPageView"
     property bool firstRun: false
     color: Theme.surface
-    radius: 12
+    radius: Theme.radiusMd
     border.color: Theme.line
     clip: true
 
@@ -172,7 +172,7 @@ Rectangle {
                         font.pixelSize: 13
                         leftPadding: 12; rightPadding: 12; topPadding: 8; bottomPadding: 8
                         background: Rectangle {
-                            radius: 7; color: Theme.raised; border.width: 1
+                            radius: Theme.radiusSm; color: Theme.raised; border.width: 1
                             border.color: tokenField.activeFocus ? Theme.accent : Theme.line
                         }
                     }

@@ -16,7 +16,7 @@ import os
 import subprocess
 import sys
 
-from PySide6.QtCore import Property, Qt
+from PySide6.QtCore import Property, QObject, Qt
 from PySide6.QtGui import QColor, QFontDatabase
 from PySide6.QtQml import qmlRegisterSingletonInstance
 
@@ -113,40 +113,67 @@ def ui_font_family() -> str:
     return next((name for name in preferred if name in families), "")
 
 
-class PlatformInfo:
-    """QML-facing, immutable description of the host platform."""
+class PlatformInfo(QObject):
+    """QML-facing, immutable description of the host platform.
 
-    def __init__(self, dark: bool | None = None, accent: str | None = None):
+    PySide6 6.12 requires the @Property decorator form on a QObject subclass;
+    assigning Property(...) as a class attribute silently yields false/empty
+    values inside QML singletons.
+    """
+
+    def __init__(self, dark: bool | None = None, accent: str | None = None,
+                 parent=None):
+        super().__init__(parent)
         self._dark = _system_dark() if dark is None else bool(dark)
         self._accent = (accent or os.environ.get("UNIPUS_ACCENT") or
                         default_accent(self._dark))
         self._family = ui_font_family()
 
-    # -- getters -----------------------------------------------------------
-    def _get_is_windows(self): return is_windows()
-    def _get_is_macos(self): return is_macos()
-    def _get_is_linux(self): return not (is_windows() or is_macos())
-    def _get_dark(self): return self._dark
-    def _get_accent(self): return QColor(self._accent)
-    def _get_accent_hex(self): return self._accent
-    def _get_family(self): return self._family
-    def _get_theme_id(self):
+    @Property(bool, constant=True)
+    def isWindows(self):
+        return is_windows()
+
+    @Property(bool, constant=True)
+    def isMacOS(self):
+        return is_macos()
+
+    @Property(bool, constant=True)
+    def isLinux(self):
+        return not (is_windows() or is_macos())
+
+    @Property(bool, constant=True)
+    def dark(self):
+        return self._dark
+
+    @Property(QColor, constant=True)
+    def accent(self):
+        return QColor(self._accent)
+
+    @Property(QColor, constant=True)
+    def accentFill(self):
+        c = QColor(self._accent)
+        return c.darker(112) if self._dark else c
+
+    @Property(QColor, constant=True)
+    def accentPressed(self):
+        c = QColor(self._accent)
+        return c.lighter(112) if self._dark else c.darker(118)
+
+    @Property(str, constant=True)
+    def accentHex(self):
+        return self._accent
+
+    @Property(str, constant=True)
+    def family(self):
+        return self._family
+
+    @Property(str, constant=True)
+    def themeId(self):
         if is_windows():
             return "winui3-dark" if self._dark else "winui3-light"
         if is_macos():
             return "mac-dark" if self._dark else "mac-light"
         return "fluent-dark" if self._dark else "fluent-light"
-
-    # PySide6 6.12 requires the decorator form; class-attribute Property
-    # assignment silently yields false/empty values inside QML singletons.
-    isWindows = Property(bool, _get_is_windows, constant=True)
-    isMacOS = Property(bool, _get_is_macos, constant=True)
-    isLinux = Property(bool, _get_is_linux, constant=True)
-    dark = Property(bool, _get_dark, constant=True)
-    accent = Property(QColor, _get_accent, constant=True)
-    accentHex = Property(str, _get_accent_hex, constant=True)
-    family = Property(str, _get_family, constant=True)
-    themeId = Property(str, _get_theme_id, constant=True)
 
     def color_scheme(self):
         return Qt.ColorScheme.Dark if self._dark else Qt.ColorScheme.Light

@@ -11,11 +11,11 @@ Rectangle {
     property bool ready: false
     property bool hasError: false
     implicitHeight: 68
-    radius: 10; color: Theme.surface; border.color: Theme.line
+    radius: Theme.radiusMd; color: Theme.surface; border.color: Theme.line
     RowLayout {
         anchors.fill: parent; anchors.margins: 12; spacing: 12
         Rectangle {
-            width: 32; height: 32; radius: 8; color: Theme.navigation
+            width: 32; height: 32; radius: Theme.radiusSm; color: Theme.navigation
             Icon { name: "account"; anchors.centerIn: parent; width: 20; height: 20 }
         }
         ColumnLayout {
@@ -24,7 +24,7 @@ Rectangle {
                 Layout.fillWidth: true; spacing: 8
                 UiText { text: "账号"; font.pixelSize: 13; color: Theme.muted; Layout.preferredWidth: 26 }
                 UiText { objectName: "accountName"; text: identity.account; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0 }
-                Rectangle { width: 6; height: 6; radius: 3; color: identity.hasError ? Theme.error : identity.busy ? Theme.accent : identity.ready ? "#45d579" : Theme.muted }
+                Rectangle { width: 6; height: 6; radius: 3; color: identity.hasError ? Theme.error : identity.busy ? Theme.accent : identity.ready ? Theme.success : Theme.muted }
                 UiText { objectName: "runtimeStatus"; text: identity.status; font.pixelSize: 13; color: identity.hasError ? Theme.error : Theme.secondary; Layout.maximumWidth: 88 }
             }
             RowLayout {

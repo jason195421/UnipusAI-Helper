@@ -18,7 +18,7 @@ Button {
     opacity: enabled ? 1 : 0.45
     font.pixelSize: 13
     background: Rectangle {
-        radius: 8
+        radius: Theme.radiusSm
         color: control.primary ? (control.down || control.hovered ? Theme.accentPressed : Theme.accentFill)
              : control.down ? Theme.hover : control.hovered ? Theme.raised
              : control.quiet ? "transparent" : Theme.surface
@@ -28,7 +28,7 @@ Button {
             anchors.fill: parent
             anchors.margins: -2
             color: "transparent"
-            radius: 10
+            radius: Theme.radiusMd
             border.color: Theme.accent
             visible: control.visualFocus
         }
@@ -40,6 +40,6 @@ Button {
     contentItem: RowLayout {
         spacing: 8
         Icon { name: control.iconName || "list"; visible: control.iconName !== ""; white: control.primary; Layout.preferredWidth: 16; Layout.preferredHeight: 16 }
-        UiText { text: control.text; font.pixelSize: 13; font.weight: Font.Medium; color: control.primary ? "white" : control.destructive ? Theme.error : control.accented ? Theme.accent : Theme.ink; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+        UiText { text: control.text; font.pixelSize: 13; font.weight: Font.Medium; color: control.primary ? Theme.accentInk : control.destructive ? Theme.error : control.accented ? Theme.accent : Theme.ink; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
     }
 }

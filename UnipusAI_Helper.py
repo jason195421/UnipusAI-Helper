@@ -6,7 +6,17 @@ except ImportError:
         @staticmethod
         def MessageBeep(*args, **kwargs):
             try:
-                print('\a', end='', flush=True)
+                if sys.platform == "darwin":
+                    # macOS 没有 winsound：用系统提示音 NSBeep，静默失败时退回响铃字符。
+                    import subprocess
+                    subprocess.run(
+                        ["osascript", "-e", "beep"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                else:
+                    print('\a', end='', flush=True)
             except Exception:
                 pass
     winsound = _MockWinsound()
@@ -97,7 +107,7 @@ gui_log_queue = queue.Queue()
 
 DEBUG_MODE = False
 
-APP_VERSION = "3.9.8"
+APP_VERSION = "3.9.9"
 
 DEFAULT_LOGIN_URL = "https://uai.unipus.cn/sso/index.html?service=https%3A%2F%2Fucloud.unipus.cn%2Fhome"
 UCLOUD_HOME_URL = "https://ucloud.unipus.cn/home"
@@ -11207,25 +11217,17 @@ class UCampusBot:
        解决：选择 [1] 自动安装，或访问 https://www.microsoft.com/edge
 
     2. FFmpeg 问题（语音识别必需）
-       原因：未安装 FFmpeg 或未添加到系统 PATH
-       解决：
-          - 方法A（推荐）：选择 [2] 自动下载安装（约130MB）
-          - 方法B：选择 [3] 将已安装的 FFmpeg 添加到 PATH
-          - 方法C：手动下载 https://ffmpeg.org/download.html
-            解压后将 bin 目录添加到系统环境变量 PATH
+       FFmpeg 已随程序内置，启动时会自动加入 PATH，正常情况下无需联网下载或手动安装。
+       仅当内置二进制被误删或损坏时才会报此问题，可选：
+          - 重新运行 scripts/fetch_ffmpeg.py 生成对应平台的内置二进制（推荐）
+          - 方法A：选择 [2] 重新下载安装（约130MB，仅作兜底）
+          - 方法B：选择 [3] 把系统已装的 FFmpeg 加入 PATH
+          - 方法C：选择 [4] 手动指定 FFmpeg 路径
+          - 或手动下载 https://ffmpeg.org/download.html
 
-    3. 验证 FFmpeg 安装
+    3. 验证 FFmpeg 是否生效
        打开 CMD 输入: ffmpeg -version
-       应显示版本信息，如 "ffmpeg version 6.0"
-
-    【手动安装 FFmpeg 步骤】
-
-    1. 访问 https://ffmpeg.org/download.html
-    2. 点击 Windows 图标，选择 "Windows builds from gyan.dev"
-    3. 下载 "ffmpeg-release-essentials.zip"
-    4. 解压到 C:\ffmpeg
-    5. 将 C:\ffmpeg\bin 添加到系统环境变量 PATH
-    6. 重启终端，输入 ffmpeg -version 验证
+       能显示版本信息即正常；程序启动时也会打印所采用的内置 FFmpeg 目录。
     """)
 
     COMPAT_EDGE_ARGS = ('--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
@@ -11653,6 +11655,11 @@ class PopupWatcher:
 if __name__ == '__main__':
     print('*' * 25 + "Unipus-Helper" + '*' * 25)
 
+    # FFmpeg 已随程序内置：先把它注入 PATH，whisper 与环境检测即可直接命中，
+    # 首次启动无需联网下载或手动安装（--skip-check 时同样生效）。
+    from unipus_helper.ffmpeg_runtime import ensure_ffmpeg_on_path
+    ensure_ffmpeg_on_path()
+
     # 先把临时目录换成可写的：受限环境下 Edge 启动会因为系统 TEMP 不可写而失败
     ensure_writable_temp_dir()
 
@@ -11661,7 +11668,7 @@ if __name__ == '__main__':
     if not skip_check:
         print("\n 提示：")
         print("   - 首次运行需要检查环境")
-        print("   - 语音识别需要 FFmpeg（约130MB，可自动安装）")
+        print("   - FFmpeg 已内置，语音识别无需联网下载或手动安装")
         print("   - 如检查通过但无法启动，使用 --skip-check 跳过")
 
     logger = setup_logging()
