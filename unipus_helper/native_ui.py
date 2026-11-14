@@ -15,6 +15,7 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from shiboken6 import delete as delete_qt_object
 
 from .paths import PROJECT_ROOT, QML_DIR
+from .platform_theme import register_platform_theme
 from .settings import SettingsBridge
 from .workbench_controller import WorkbenchController
 
@@ -272,7 +273,10 @@ class NativeModernGUI(WorkbenchController):
         app.setApplicationName("UnipusAI-Helper")
         app.setOrganizationName("UnipusAI-Helper")
         app.setWindowIcon(QIcon(str(QML_DIR / "icons" / "app.svg")))
-        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+        # Register the platform singleton BEFORE the engine loads Main.qml so
+        # Theme.qml can pick the WinUI 3 / macOS palette from the first frame.
+        platform = register_platform_theme()
+        app.styleHints().setColorScheme(platform.color_scheme())
         configure_ui_font(app)
         log_path = PROJECT_ROOT / "logs" / "native-ui.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -364,7 +368,8 @@ def run_setup_mode(*, close_after=None):
     app.setApplicationName("UnipusAI-Helper")
     app.setOrganizationName("UnipusAI-Helper")
     app.setWindowIcon(QIcon(str(QML_DIR / "icons" / "app.svg")))
-    app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+    platform = register_platform_theme()
+    app.styleHints().setColorScheme(platform.color_scheme())
     configure_ui_font(app)
 
     def qt_message(kind, context, message):
