@@ -37,6 +37,141 @@ from unipus_helper.paths import PROJECT_ROOT
 BASE_DIR = str(PROJECT_ROOT)
 
 
+# ==================== GUI / windowed stdio bootstrap ====================
+# PyInstaller 的 windowed 构建（console=False，即 release 版）在 Windows 上会把
+# sys.stdout / sys.stderr / sys.stdin 全部置为 None：此时任何 print()、input()，
+# 或 logging.StreamHandler(None) 都会直接抛异常，程序连设置页都起不来。
+# 必须在任何输出之前把它们换成写文件的安全对象，并标记 GUI_MODE。
+# 源码运行与 debug 构建（console=True）下三个流是真实的，这里完全不介入。
+# 也可用 UNIPUS_GUI=1 在源码模式下强制模拟，便于本地验证 release 行为。
+GUI_MODE = False
+_GUI_STDIO_STREAM = None
+
+
+class _SafeWriter:
+    """windowed 模式下的 stdout/stderr 替身：把文本写进日志文件。
+
+    tqdm（whisper 使用）等库会访问 isatty() / fileno() / encoding，
+    所以不能只实现 write/flush，否则语音识别阶段照样会崩。
+    """
+
+    def __init__(self, path):
+        self._path = path
+        self._fh = None
+        self.encoding = 'utf-8'
+
+    def _file(self):
+        if self._fh is None:
+            try:
+                os.makedirs(os.path.dirname(self._path), exist_ok=True)
+                self._fh = open(self._path, 'a', encoding='utf-8', errors='replace')
+            except Exception:
+                return None
+        return self._fh
+
+    def write(self, text):
+        try:
+            fh = self._file()
+            if fh is not None:
+                fh.write(text)
+                fh.flush()
+        except Exception:
+            pass
+        return len(text) if isinstance(text, str) else 0
+
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+    def flush(self):
+        try:
+            if self._fh is not None:
+                self._fh.flush()
+        except Exception:
+            pass
+
+    def isatty(self):
+        return False
+
+    def fileno(self):
+        raise OSError('no fileno in GUI mode')
+
+    def readable(self):
+        return False
+
+    def writable(self):
+        return True
+
+    def seekable(self):
+        return False
+
+
+class _NullInput:
+    """windowed 模式下的 stdin 替身：input() 立即返回空串，绝不阻塞 GUI 线程。"""
+
+    encoding = 'utf-8'
+
+    def readline(self, *args, **kwargs):
+        return ''
+
+    def read(self, *args, **kwargs):
+        return ''
+
+    def isatty(self):
+        return False
+
+    def fileno(self):
+        raise OSError('no fileno in GUI mode')
+
+
+def _bootstrap_gui_stdio():
+    """检测无控制台环境并接管标准流；返回是否处于 GUI 模式。"""
+    global GUI_MODE, _GUI_STDIO_STREAM
+    forced = os.environ.get('UNIPUS_GUI', '').strip().lower() in ('1', 'true', 'yes', 'on')
+    headless = bool(getattr(sys, 'frozen', False)) and (
+        sys.stdout is None or sys.stderr is None or sys.stdin is None
+    )
+    if not (forced or headless):
+        return False
+    GUI_MODE = True
+    log_dir = os.path.join(BASE_DIR, 'logs')
+    _GUI_STDIO_STREAM = _SafeWriter(os.path.join(log_dir, 'gui-stderr.log'))
+    sys.stdout = _SafeWriter(os.path.join(log_dir, 'gui-stdout.log'))
+    sys.stderr = _GUI_STDIO_STREAM
+    sys.stdin = _NullInput()
+    return True
+
+
+def _gui_fatal(message):
+    """GUI 模式没有控制台：写一份错误说明，并尽量弹系统对话框告知用户。"""
+    if not GUI_MODE:
+        return
+    if not os.environ.get('UNIPUS_GUI_NO_DIALOG'):
+        try:
+            if sys.platform == 'win32':
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(0, str(message), 'UnipusAI-Helper 启动失败', 0x10)
+            elif sys.platform == 'darwin':
+                safe = str(message)[:400].replace(chr(34), chr(39))
+                dq = chr(34)
+                script = 'display alert ' + dq + 'UnipusAI-Helper' + dq + ' message ' + dq + safe + dq
+                subprocess.run(['osascript', '-e', script],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        except Exception:
+            pass
+    try:
+        path = os.path.join(BASE_DIR, 'logs', '启动失败.txt')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write(str(message))
+    except Exception:
+        pass
+
+
+_bootstrap_gui_stdio()
+# ======================================================================
+
+
 def ensure_writable_temp_dir() -> str:
     """确保 TEMP/TMP 指向可写目录。
 
@@ -107,7 +242,7 @@ gui_log_queue = queue.Queue()
 
 DEBUG_MODE = False
 
-APP_VERSION = "3.9.9"
+APP_VERSION = "3.9.10"
 
 DEFAULT_LOGIN_URL = "https://uai.unipus.cn/sso/index.html?service=https%3A%2F%2Fucloud.unipus.cn%2Fhome"
 UCLOUD_HOME_URL = "https://ucloud.unipus.cn/home"
@@ -153,7 +288,10 @@ def setup_logging():
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
 
-    console_handler = logging.StreamHandler(sys.stdout)
+    # GUI/windowed 模式下 stdout 稍后会被 PrintRedirector 接管；把控制台
+    # handler 固定指向常驻的 _SafeWriter，避免流被换掉或日志自我递归。
+    _console_stream = _GUI_STDIO_STREAM if (GUI_MODE and _GUI_STDIO_STREAM is not None) else sys.stdout
+    console_handler = logging.StreamHandler(_console_stream)
     console_handler.setLevel(logging.INFO)
 
     class ConsoleFilter(logging.Filter):
@@ -185,6 +323,18 @@ def setup_logging():
 
         def flush(self):
             pass
+
+        def writelines(self, lines):
+            for line in lines:
+                self.write(line)
+
+        def isatty(self):
+            return False
+
+        def fileno(self):
+            raise OSError('no fileno in GUI mode')
+
+        encoding = 'utf-8'
 
     sys.stdout = PrintRedirector(logger)
     return logger
@@ -11172,6 +11322,14 @@ class UCampusBot:
         checker = EnvironmentChecker()
 
         if not checker.check_all():
+            if GUI_MODE:
+                # 无终端可读：input() 会立刻返回空串，交互式菜单会无限循环。
+                # 把检查结果写进日志后继续启动，绝不阻塞 GUI 线程。
+                for _issue in checker.issues:
+                    print(f" [环境检查] {_issue}")
+                print(" [环境检查] GUI 模式：跳过交互式修复菜单，程序继续启动。")
+                print(" [环境检查] 详情见 logs/ 目录；FFmpeg 已内置，Edge 请自行安装。")
+                return
             while True:
                 choice = checker.show_fix_guide()
 
@@ -11683,6 +11841,7 @@ if __name__ == '__main__':
         except Exception as exc:
             print(f"\n 设置界面启动失败: {exc}")
             logger.exception("设置界面启动失败")
+            _gui_fatal(f"设置界面启动失败: {exc}")
             sys.exit(1)
         print("配置已保存，请重新启动程序。")
         sys.exit(0)
@@ -11698,6 +11857,7 @@ if __name__ == '__main__':
         error_msg = str(e)
         print(f"\n 程序运行失败: {error_msg[:100]}")
         logger.error(f"程序异常: {error_msg}", exc_info=True)
+        _gui_fatal(f"程序运行失败: {error_msg}")
         exit_code = 1
     finally:
         if bot:

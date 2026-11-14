@@ -1,0 +1,113 @@
+name: Build Windows app
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Publish the installers to a GitHub Release for this tag'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Windows ${{ matrix.mode }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [debug, release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          # Whisper only needs CPU inference; the CPU wheel is far smaller than
+          # the default CUDA-enabled Windows wheel and downloads much faster.
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt
+          python -m pip install "pyinstaller==6.22.3"
+
+      - name: Fetch bundled FFmpeg (win32-x64)
+        shell: pwsh
+        run: |
+          python scripts/fetch_ffmpeg.py --platform win32-x64 --registry https://registry.npmjs.org
+          if (-not (Test-Path ffmpeg/win32-x64/ffmpeg.exe)) { throw "ffmpeg.exe missing" }
+          if (-not (Test-Path ffmpeg/win32-x64/ffprobe.exe)) { throw "ffprobe.exe missing" }
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            # Portable fallback: the installer can unpack ISCC.exe without admin rights.
+            $url = "https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe"
+            $exe = Join-Path $env:RUNNER_TEMP "innosetup.exe"
+            $ok = $false
+            for ($i = 0; $i -lt 4 -and -not $ok; $i++) {
+              try {
+                Invoke-WebRequest -Uri $url -OutFile $exe -UseBasicParsing
+                if ((Get-Item $exe).Length -gt 1MB) { $ok = $true }
+              } catch { Start-Sleep -Seconds 3 }
+            }
+            if (-not $ok) { throw "Could not download Inno Setup portable installer" }
+            $dir = Join-Path $env:RUNNER_TEMP "inno6"
+            Start-Process -FilePath $exe -ArgumentList @("/SP-","/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/NOCANCEL","/PORTABLE=1","/DIR=$dir") -Wait
+            $iscc = Join-Path $dir "ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found" }
+          "UNIPUS_ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "ISCC ready: $iscc"
+
+      - name: Build ${{ matrix.mode }} variant
+        shell: pwsh
+        run: |
+          python scripts/build_variant.py --mode ${{ matrix.mode }}
+
+      - name: Smoke test (offscreen, non-fatal)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          python scripts/smoke_test.py --mode ${{ matrix.mode }} --seconds 12
+
+      - name: Upload runtime logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnipusAI-Helper-Windows-${{ matrix.mode }}-logs
+          path: dist/**/logs/*.log
+          if-no-files-found: ignore
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnipusAI-Helper-Windows-${{ matrix.mode }}
+          path: |
+            installer/*.exe
+            installer/*.zip
+            docs/发布说明_Windows.txt
+          if-no-files-found: error
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer/*.exe
+            installer/*.zip
+          fail_on_unmatched_files: true

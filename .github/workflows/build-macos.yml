@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Publish the archives to a GitHub Release for this tag'
+        description: 'Publish the DMGs to a GitHub Release for this tag'
         type: boolean
         default: false
   push:
@@ -16,17 +16,19 @@ permissions:
 
 jobs:
   build:
-    name: macOS ${{ matrix.arch }}
+    name: macOS ${{ matrix.arch }} / ${{ matrix.mode }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
+        arch: [arm64, x64]
+        mode: [debug, release]
         include:
-          - runner: macos-15
-            arch: arm64
+          - arch: arm64
+            runner: macos-15
             platform_id: darwin-arm64
-          - runner: macos-15-intel
-            arch: x64
+          - arch: x64
+            runner: macos-15-intel
             platform_id: darwin-x64
 
     steps:
@@ -57,52 +59,59 @@ jobs:
             --registry https://registry.npmjs.org
           file ffmpeg/${{ matrix.platform_id }}/ffmpeg ffmpeg/${{ matrix.platform_id }}/ffprobe
 
-      - name: Build .app bundle
+      - name: Build ${{ matrix.mode }} variant + DMG
         run: |
-          python -m PyInstaller --noconfirm --clean UnipusAI-Helper.spec
-          test -d "dist/UnipusAI-Helper.app" || (echo "::error::.app bundle was not produced" && exit 1)
+          python scripts/build_variant.py --mode "${{ matrix.mode }}"
+          test -f "installer/UnipusAI-Helper-macOS-${{ matrix.arch }}-${{ matrix.mode }}.dmg" || (echo "::error::DMG was not produced" && exit 1)
 
-      - name: Ad-hoc sign (keep the bundle structurally valid)
-        run: |
-          codesign --force --deep --sign - "dist/UnipusAI-Helper.app" || true
-          codesign --verify --deep --strict "dist/UnipusAI-Helper.app" || true
-
-      - name: Ship the release notes next to the app
+      - name: Ship the release notes
         run: |
           mkdir -p dist/release
           cp README.md dist/release/README.md
-          cp "dist/UnipusAI-Helper.app/Contents/Info.plist" dist/release/Info.plist || true
           cat > dist/release/README-macOS.txt <<'EOF'
-          UnipusAI-Helper — macOS
-          
-          1. Move "UnipusAI-Helper.app" to /Applications (or anywhere you like).
-          2. If macOS says the app is damaged or from an unidentified developer, run:
-                 xattr -cr /Applications/UnipusAI-Helper.app
-             This clears the quarantine flag on an unsigned, ad-hoc signed build.
-          3. Launch it once. The built-in Setup page appears on first run; save your
-             configuration and relaunch. Configuration and logs are stored in
-                 ~/Library/Application Support/UnipusAI-Helper/
-             so the .app bundle itself stays read-only.
-          4. FFmpeg / ffprobe are bundled inside the app; no Homebrew install or network
-             download is needed for speech recognition.
-          
-          Voice features also need Microsoft Edge; the built-in environment check
-          guides you through installing it if it is missing.
+          UnipusAI-Helper — macOS (${{ matrix.arch }}, ${{ matrix.mode }})
+
+          This DMG contains the ${{ matrix.mode }} build.
+
+          release : a standard .app bundle. Double-click it from Finder; no
+                    Terminal window is shown. Drag it to /Applications.
+          debug   : a plain folder plus "Run-Debug.command". Double-click the
+                    .command file to launch from Terminal so console output
+                    stays visible while troubleshooting.
+
+          If macOS says the app is damaged or from an unidentified developer:
+              xattr -cr /Applications/UnipusAI-Helper.app
+          This clears the quarantine flag on an unsigned, ad-hoc signed build.
+
+          Launch once: the built-in Setup page appears on first run; save your
+          configuration and relaunch. Configuration and logs live in
+              ~/Library/Application Support/UnipusAI-Helper/
+          so the .app bundle itself stays read-only.
+
+          FFmpeg / ffprobe are bundled; no Homebrew or network download is
+          needed for speech recognition. Voice features also need Microsoft
+          Edge, which the built-in environment check helps you install.
           EOF
 
-      - name: Archive .app (preserve symlinks + executable bits)
+      - name: Smoke test (offscreen, non-fatal)
+        continue-on-error: true
         run: |
-          cd dist
-          ditto -c -k --sequesterRsrc --keepParent \
-            "UnipusAI-Helper.app" \
-            "UnipusAI-Helper-macOS-${{ matrix.arch }}.zip"
+          python scripts/smoke_test.py --mode "${{ matrix.mode }}" --seconds 12
 
-      - name: Upload build artifact
+      - name: Upload runtime logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: UnipusAI-Helper-macOS-${{ matrix.arch }}
+          name: UnipusAI-Helper-macOS-${{ matrix.arch }}-${{ matrix.mode }}-logs
+          path: dist/**/logs/*.log
+          if-no-files-found: ignore
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnipusAI-Helper-macOS-${{ matrix.arch }}-${{ matrix.mode }}
           path: |
-            dist/UnipusAI-Helper-macOS-${{ matrix.arch }}.zip
+            installer/UnipusAI-Helper-macOS-${{ matrix.arch }}-${{ matrix.mode }}.dmg
             dist/release/README-macOS.txt
           if-no-files-found: error
 
@@ -110,5 +119,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') || inputs.create_release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/UnipusAI-Helper-macOS-${{ matrix.arch }}.zip
+          files: installer/UnipusAI-Helper-macOS-${{ matrix.arch }}-${{ matrix.mode }}.dmg
           fail_on_unmatched_files: true

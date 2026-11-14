@@ -1,0 +1,212 @@
+[build] DEBUG build: console/terminal kept, name suffix -Debug
+[build] $ C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean UnipusAI-Helper.spec
+174 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.10
+174 INFO: Python: 3.12.7
+202 INFO: Platform: Windows-11-10.0.26200-SP0
+202 INFO: Python environment: C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv
+206 INFO: Removing temporary files and cleaning cache in C:\Users\Jason\AppData\Local\pyinstaller
+1098 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper',
+ 'C:\\Users\\Jason\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip',
+ 'C:\\Users\\Jason\\AppData\\Local\\Programs\\Python\\Python312\\DLLs',
+ 'C:\\Users\\Jason\\AppData\\Local\\Programs\\Python\\Python312\\Lib',
+ 'C:\\Users\\Jason\\AppData\\Local\\Programs\\Python\\Python312',
+ 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv',
+ 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\win32',
+ 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\pythonwin',
+ 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper']
+1539 INFO: Appending 'datas' from .spec
+1542 INFO: checking Analysis
+1542 INFO: Building Analysis because Analysis-00.toc is non existent
+1542 INFO: Looking for Python shared library...
+1543 INFO: Using Python shared library: C:\Users\Jason\AppData\Local\Programs\Python\Python312\python312.dll
+1543 INFO: Running Analysis Analysis-00.toc
+1543 INFO: Target bytecode optimization level: 0
+1543 INFO: Initializing module dependency graph...
+1544 INFO: Initializing module graph hook caches...
+1589 INFO: Analyzing modules for base_library.zip ...
+2654 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+3031 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+3153 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+3705 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4568 INFO: Caching module dependency graph...
+4594 INFO: Analyzing C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\UnipusAI_Helper.py
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\UnipusAI_Helper.py:7195: SyntaxWarning: invalid escape sequence '\s'
+  prep = self.driver.execute_script("""
+5236 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5292 INFO: Processing standard module hook 'hook-torch.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+1711 WARNING: Failed to collect submodules for 'torch.utils.tensorboard' because importing 'torch.utils.tensorboard' raised: ModuleNotFoundError: No module named 'tensorboard'
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(name)
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(name)
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(name)
+18746 INFO: hook-torch: this torch build does not depend on MKL...
+18763 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+18765 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+18768 INFO: SetuptoolsInfo: initializing cached setuptools info...
+19539 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+19593 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+20437 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+21096 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+21195 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+21890 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+22304 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+29028 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+31822 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+31837 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+31873 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+31875 INFO: Setuptools: 'jaraco' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.jaraco'!
+31880 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+31953 INFO: Processing standard module hook 'hook-_osx_support.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+31979 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+32398 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+32399 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+32404 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+32405 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.backports'!
+32674 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+32674 INFO: Setuptools: 'tomli' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.tomli'!
+32988 INFO: Processing pre-safe-import-module hook 'hook-wheel.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+32989 INFO: Setuptools: 'wheel' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.wheel'!
+33012 INFO: Processing pre-safe-import-module hook 'hook-win32com.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+33202 INFO: Processing standard module hook 'hook-win32com.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+33204 INFO: Processing standard module hook 'hook-pythoncom.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+33434 INFO: Processing standard module hook 'hook-pywintypes.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+33641 INFO: Processing standard module hook 'hook-sqlite3.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+48778 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+49202 INFO: Processing standard module hook 'hook-numba.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+49218 INFO: Processing standard module hook 'hook-llvmlite.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+49624 INFO: Processing standard module hook 'hook-pycparser.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+50727 INFO: Processing standard module hook 'hook-jinja2.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+61402 INFO: Processing standard module hook 'hook-fsspec.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+62240 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+66290 INFO: Processing standard module hook 'hook-regex.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+66452 INFO: Processing standard module hook 'hook-pydantic.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+67123 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+67885 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+68375 INFO: Processing standard module hook 'hook-anyio.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+74241 INFO: Processing standard module hook 'hook-selenium.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+74831 INFO: Processing standard module hook 'hook-PySide6.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+75137 INFO: Processing standard module hook 'hook-shiboken6.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+75230 INFO: Processing standard module hook 'hook-PySide6.QtNetwork.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+90994 INFO: Processing standard module hook 'hook-PySide6.QtCore.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+102540 INFO: Processing standard module hook 'hook-PySide6.QtGui.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+184418 INFO: Processing standard module hook 'hook-PySide6.QtQml.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+215510 WARNING: QtLibraryInfo(PySide6): QML plugin binary 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PySide6\\qml\\Qt\\labs\\assetdownloader\\qmlassetdownloaderprivateplugin.dll' does not exist!
+342512 INFO: Processing standard module hook 'hook-PySide6.QtQuickControls2.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+346762 INFO: Analyzing hidden import 'selenium.webdriver.chrome.options'
+346767 INFO: Analyzing hidden import 'selenium.webdriver.chrome.service'
+346769 INFO: Analyzing hidden import 'selenium.webdriver.chrome.webdriver'
+346781 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.bluetooth'
+346790 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.browser'
+346802 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.browsing_context'
+346844 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.digital_credentials'
+346847 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.emulation'
+346859 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.input'
+346869 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.log'
+346872 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.network'
+346888 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.permissions'
+346891 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.speculation'
+346892 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.storage'
+346898 INFO: Analyzing hidden import 'selenium.webdriver.common._bidi.user_agent_client_hints'
+346901 INFO: Analyzing hidden import 'selenium.webdriver.common.bidi.cdp'
+346936 INFO: Analyzing hidden import 'selenium.webdriver.common.bidi.console'
+346938 INFO: Analyzing hidden import 'selenium.webdriver.common.log'
+346942 INFO: Analyzing hidden import 'selenium.webdriver.common.window'
+346943 INFO: Analyzing hidden import 'selenium.webdriver.edge.options'
+346945 INFO: Analyzing hidden import 'selenium.webdriver.edge.webdriver'
+346946 INFO: Analyzing hidden import 'selenium.webdriver.firefox.firefox_profile'
+346949 INFO: Analyzing hidden import 'selenium.webdriver.firefox.options'
+346951 INFO: Analyzing hidden import 'selenium.webdriver.firefox.service'
+346954 INFO: Analyzing hidden import 'selenium.webdriver.firefox.webdriver'
+346957 INFO: Analyzing hidden import 'selenium.webdriver.ie'
+346958 INFO: Analyzing hidden import 'selenium.webdriver.ie.options'
+346961 INFO: Analyzing hidden import 'selenium.webdriver.ie.service'
+346963 INFO: Analyzing hidden import 'selenium.webdriver.ie.webdriver'
+346964 INFO: Analyzing hidden import 'selenium.webdriver.remote.server'
+346968 INFO: Analyzing hidden import 'selenium.webdriver.safari.options'
+346970 INFO: Analyzing hidden import 'selenium.webdriver.safari.permissions'
+346970 INFO: Analyzing hidden import 'selenium.webdriver.safari.service'
+346972 INFO: Analyzing hidden import 'selenium.webdriver.safari.webdriver'
+346973 INFO: Analyzing hidden import 'selenium.webdriver.support.abstract_event_listener'
+346975 INFO: Analyzing hidden import 'selenium.webdriver.support.color'
+346982 INFO: Analyzing hidden import 'selenium.webdriver.support.event_firing_webdriver'
+346987 INFO: Analyzing hidden import 'selenium.webdriver.support.events'
+346988 INFO: Analyzing hidden import 'selenium.webdriver.webkitgtk'
+346989 INFO: Analyzing hidden import 'selenium.webdriver.webkitgtk.options'
+346991 INFO: Analyzing hidden import 'selenium.webdriver.webkitgtk.service'
+346992 INFO: Analyzing hidden import 'selenium.webdriver.webkitgtk.webdriver'
+346993 INFO: Analyzing hidden import 'selenium.webdriver.wpewebkit'
+346995 INFO: Analyzing hidden import 'selenium.webdriver.wpewebkit.options'
+346996 INFO: Analyzing hidden import 'selenium.webdriver.wpewebkit.service'
+346998 INFO: Analyzing hidden import 'selenium.webdriver.wpewebkit.webdriver'
+346999 INFO: Analyzing hidden import 'PySide6.QtQuick'
+347056 INFO: Processing standard module hook 'hook-PySide6.QtQuick.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+353202 INFO: Processing standard module hook 'hook-PySide6.QtOpenGL.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+362869 INFO: Analyzing hidden import 'tiktoken_ext.openai_public'
+362878 INFO: Processing module hooks (post-graph stage)...
+363166 WARNING: Hidden import "pycparser.lextab" not found!
+363166 WARNING: Hidden import "pycparser.yacctab" not found!
+364414 INFO: Processing pre-safe-import-module hook 'hook-tensorflow.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+367972 WARNING: Hidden import "tzdata" not found!
+368075 INFO: Performing binary vs. data reclassification (2027 entries)
+368635 INFO: Looking for ctypes DLLs
+368762 WARNING: Ignoring /usr/lib64/libgomp.so.1 imported from C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\torch\_inductor\codecache.py - only basenames are supported with ctypes imports!
+369162 INFO: Analyzing run-time hooks ...
+369341 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+369345 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+369347 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+369350 INFO: Including run-time hook 'pyi_rth_pywintypes.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+369351 INFO: Including run-time hook 'pyi_rth_pythoncom.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+369352 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+369354 INFO: Including run-time hook 'pyi_rth_pyside6.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+369356 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+369359 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+369496 INFO: Creating base_library.zip...
+369540 INFO: Looking for dynamic libraries
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(package)
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(package)
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(package)
+382860 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\shiboken6', 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\torch\\lib', 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\numpy.libs', 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\llvmlite.libs']
+382860 INFO: Extra DLL search directories (PATH): ['C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\PySide6']
+385345 WARNING: Library not found: could not resolve 'tbb12.dll', dependency of 'C:\\Users\\Jason\\Documents\\GitHub\\UnipusAI-Helper\\.venv\\Lib\\site-packages\\numba\\np\\ufunc\\tbbpool.cp312-win_amd64.pyd'.
+385440 INFO: Warnings written to C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\build\UnipusAI-Helper\warn-UnipusAI-Helper.txt
+385858 INFO: Graph cross-reference written to C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\build\UnipusAI-Helper\xref-UnipusAI-Helper.html
+386023 INFO: checking PYZ
+386023 INFO: Building PYZ because PYZ-00.toc is non existent
+386023 INFO: Building PYZ (ZlibArchive) C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\build\UnipusAI-Helper\PYZ-00.pyz
+389924 INFO: Building PYZ (ZlibArchive) C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\build\UnipusAI-Helper\PYZ-00.pyz completed successfully.
+390002 INFO: checking PKG
+390002 INFO: Building PKG because PKG-00.toc is non existent
+390002 INFO: Building PKG (CArchive) UnipusAI-Helper-Debug.pkg
+C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\UnipusAI_Helper.py:7195: SyntaxWarning: invalid escape sequence '\s'
+  prep = self.driver.execute_script("""
+390343 INFO: Building PKG (CArchive) UnipusAI-Helper-Debug.pkg completed successfully.
+390344 INFO: Bootloader C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\.venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+390344 INFO: checking EXE
+390344 INFO: Building EXE because EXE-00.toc is non existent
+390344 INFO: Building EXE from EXE-00.toc
+390345 INFO: Copying bootloader EXE to C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\build\UnipusAI-Helper\UnipusAI-Helper-Debug.exe
+390351 INFO: Copying icon to EXE
+390358 INFO: Copying 0 resources to EXE
+390358 INFO: Embedding manifest in EXE
+390362 INFO: Appending PKG archive to EXE
+390406 INFO: Fixing EXE headers
+390676 INFO: Building EXE from EXE-00.toc completed successfully.
+390909 INFO: checking COLLECT
+390909 INFO: Building COLLECT because COLLECT-00.toc is non existent
+390909 INFO: Building COLLECT COLLECT-00.toc
+397415 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+397476 INFO: Build complete! The results are available in: C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\dist
+[spec] BUILD_MODE=debug IS_DEBUG=True IS_MAC=False CONSOLE=True MAKE_APP_BUNDLE=False EXE_NAME=UnipusAI-Helper-Debug
+[build] seeded C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\dist\UnipusAI-Helper-Debug\config.json
+[build] payload verification OK
+[build] payload: C:\Users\Jason\Documents\GitHub\UnipusAI-Helper\dist\UnipusAI-Helper-Debug
+[build] DONE (debug)
+PYI_DEBUG_EXIT=0

@@ -1,9 +1,52 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for UnipusAI-Helper (single onedir exe, console; settings built in)."""
+"""PyInstaller spec for UnipusAI-Helper.
+
+One spec produces two build variants, selected by the UNIPUS_BUILD_MODE
+environment variable (see scripts/build_variant.py):
+
+  UNIPUS_BUILD_MODE=debug    console=True  -> terminal visible on Windows,
+                               Terminal logs on macOS; name suffix "-Debug";
+                               no macOS .app bundle.
+  UNIPUS_BUILD_MODE=release  console=False -> pure GUI / windowed, no terminal;
+                               macOS gets a real .app bundle.
+
+The runtime (UnipusAI_Helper.py) detects a windowed build automatically
+(sys.stdout/stderr/stdin are None) and switches to GUI_MODE: stdio is
+redirected to log files, fatal errors surface as a system dialog, and the
+interactive environment-check menu is skipped.  A release build additionally
+forces UNIPUS_GUI=1 through a runtime hook, so the console flag remains the
+single source of truth for debug vs release behaviour.
+"""
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import os
 import platform as _platform
 import sys as _sys
+
+APP_VERSION = "3.9.10"
+
+BUILD_MODE = os.environ.get("UNIPUS_BUILD_MODE", "release").strip().lower()
+if BUILD_MODE not in ("debug", "release"):
+    BUILD_MODE = "release"
+IS_DEBUG = BUILD_MODE == "debug"
+IS_MAC = _sys.platform == "darwin"
+SUFFIX = "-Debug" if IS_DEBUG else ""
+
+# A console=True macOS .app bundle writes LSBackgroundOnly into Info.plist,
+# which hides the Dock icon / menu bar and stops the QML window from appearing.
+# Therefore macOS console (debug) builds are shipped as a plain onedir folder
+# launched from Terminal, while only macOS release builds become a .app.
+CONSOLE = IS_DEBUG
+MAKE_APP_BUNDLE = IS_MAC and not IS_DEBUG
+
+EXE_NAME = "UnipusAI-Helper" + SUFFIX
+COLLECT_NAME = "UnipusAI-Helper" + SUFFIX
+APP_NAME = "UnipusAI-Helper" + SUFFIX + ".app"
+
+RUNTIME_HOOKS = [] if IS_DEBUG else ["scripts/gui_runtime_hook.py"]
+
+print("[spec] BUILD_MODE=%s IS_DEBUG=%s IS_MAC=%s CONSOLE=%s "
+      "MAKE_APP_BUNDLE=%s EXE_NAME=%s" % (
+          BUILD_MODE, IS_DEBUG, IS_MAC, CONSOLE, MAKE_APP_BUNDLE, EXE_NAME))
 
 
 def _ffmpeg_platform_id():
@@ -55,7 +98,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=RUNTIME_HOOKS,
     # 配置编辑已合并进主程序的 PySide6 / QML 设置页；旧版 PyQt5 编辑器不再打包。
     excludes=['PyQt5', 'qfluentwidgets'],
     noarchive=False,
@@ -68,12 +111,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='UnipusAI-Helper',
+    name=EXE_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=(_sys.platform != 'darwin'),
+    console=CONSOLE,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -87,23 +130,25 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='UnipusAI-Helper',
+    name=COLLECT_NAME,
 )
 
-# A real .app bundle is only meaningful on macOS.  On Windows this block is
-# skipped entirely, so the existing onedir + console build is unchanged.
-if _sys.platform == "darwin":
+# A real .app bundle is only meaningful on macOS release builds.  Debug builds
+# (console=True) stay a plain onedir folder launched from Terminal, and Windows
+# never produces a .app.
+if MAKE_APP_BUNDLE:
     from PyInstaller.building.osx import BUNDLE
 
     app = BUNDLE(
         coll,
-        name='UnipusAI-Helper.app',
+        name=APP_NAME,
         icon=None,
         bundle_identifier='com.jason195421.unipusai-helper',
-        version='3.9.9',
+        version=APP_VERSION,
         info_plist={
             'NSHighResolutionCapable': True,
             'LSMinimumSystemVersion': '11.0',
             'CFBundleDisplayName': 'UnipusAI-Helper',
+            'CFBundleName': 'UnipusAI-Helper',
         },
     )
