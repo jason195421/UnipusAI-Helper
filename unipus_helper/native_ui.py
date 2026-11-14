@@ -15,6 +15,7 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from shiboken6 import delete as delete_qt_object
 
 from .paths import PROJECT_ROOT, QML_DIR
+from .settings import SettingsBridge
 from .workbench_controller import WorkbenchController
 
 
@@ -290,8 +291,10 @@ class NativeModernGUI(WorkbenchController):
         previous_handler = qInstallMessageHandler(qt_message)
         engine = QQmlApplicationEngine()
         bridge = NativeBridge(self)
+        settings_bridge = SettingsBridge()
         engine.rootContext().setContextProperty("workbench", bridge)
         engine.rootContext().setContextProperty("taskModel", bridge.task_model)
+        engine.rootContext().setContextProperty("settings", settings_bridge)
         # Python signal handlers run whenever Qt returns to this timer's callback.
         pulse = QTimer()
         pulse.timeout.connect(lambda: None)
@@ -342,7 +345,61 @@ class NativeModernGUI(WorkbenchController):
             # Destroy QML bindings while their Python objects still exist.
             delete_qt_object(engine)
             delete_qt_object(bridge)
+            delete_qt_object(settings_bridge)
             qInstallMessageHandler(previous_handler)
             qt_logger.removeHandler(log_file)
             log_file.close()
         return result
+
+
+def run_setup_mode(*, close_after=None):
+    """Launch only the built-in Settings page (used when config.json is empty).
+
+    No Edge browser, no OpenAI client and no automation work is started.
+    Saving the config (or closing the window) exits; the user then restarts
+    the program to run the full workbench.
+    """
+    QQuickStyle.setStyle("Basic")
+    app = QGuiApplication.instance() or QGuiApplication(sys.argv[:1])
+    app.setApplicationName("UnipusAI-Helper")
+    app.setOrganizationName("UnipusAI-Helper")
+    app.setWindowIcon(QIcon(str(QML_DIR / "icons" / "app.svg")))
+    app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+    configure_ui_font(app)
+
+    def qt_message(kind, context, message):
+        if kind in (QtMsgType.QtWarningMsg, QtMsgType.QtCriticalMsg, QtMsgType.QtFatalMsg):
+            print(f"Qt: {message}", file=sys.stderr)
+
+    previous_handler = qInstallMessageHandler(qt_message)
+
+    controller = WorkbenchController()
+    controller._status = "等待配置"
+    bridge = NativeBridge(controller)
+    settings_bridge = SettingsBridge(setup_mode=True)
+    settings_bridge.saved.connect(app.quit)
+    engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("workbench", bridge)
+    engine.rootContext().setContextProperty("taskModel", bridge.task_model)
+    engine.rootContext().setContextProperty("settings", settings_bridge)
+
+    pulse = QTimer()
+    pulse.timeout.connect(lambda: None)
+    pulse.start(100)
+    try:
+        engine.load(QUrl.fromLocalFile(str(QML_DIR / "Main.qml")))
+        if not engine.rootObjects():
+            raise RuntimeError("QML 设置界面加载失败")
+        engine.setIncubationController(None)
+        if close_after:
+            QTimer.singleShot(close_after, app.quit)
+        app.exec()
+    finally:
+        pulse.stop()
+        bridge.timer.stop()
+        controller.close()
+        # Destroy QML bindings while their Python objects still exist.
+        delete_qt_object(engine)
+        delete_qt_object(bridge)
+        delete_qt_object(settings_bridge)
+        qInstallMessageHandler(previous_handler)

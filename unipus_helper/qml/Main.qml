@@ -20,7 +20,8 @@ ApplicationWindow {
     palette.buttonText: Theme.ink
     palette.highlight: Theme.accentFill
     palette.highlightedText: "white"
-    property int currentPage: 0
+    readonly property bool setupMode: (typeof settings !== "undefined" && !!settings.setupMode)
+    property int currentPage: setupMode ? 2 : 0
     readonly property int pageMargin: width < 1100 ? 20 : 28
     readonly property bool compactHeight: height < 720
     readonly property var appState: workbench.state
@@ -30,6 +31,7 @@ ApplicationWindow {
     property bool returnToTasksWhenIdle: false
 
     function finishProcessingNavigation() {
+        if (window.setupMode) return
         if (!returnToTasksWhenIdle || !appState || appState.busy) return
         returnToTasksWhenIdle = false
         // Leave stopped or failed runs available for inspection in the log.
@@ -62,7 +64,7 @@ ApplicationWindow {
         searchInput.forceActiveFocus()
     }
 
-    Shortcut { sequences: [StandardKey.Find]; onActivated: { window.currentPage = 0; searchInput.forceActiveFocus(); searchInput.selectAll() } }
+    Shortcut { sequences: [StandardKey.Find]; enabled: !window.setupMode; onActivated: { window.currentPage = 0; searchInput.forceActiveFocus(); searchInput.selectAll() } }
     Shortcut { sequence: StandardKey.Quit; onActivated: window.close() }
 
     RowLayout {
@@ -81,8 +83,9 @@ ApplicationWindow {
                     Image { source: "icons/app.svg"; sourceSize.width: 80; sourceSize.height: 80; Layout.preferredWidth: 32; Layout.preferredHeight: 32 }
                     UiText { objectName: "projectName"; text: "UnipusAI-Helper"; font.pixelSize: window.width < 1100 ? 16 : 17; font.weight: Font.DemiBold; Layout.fillWidth: true }
                 }
-                NavItem { objectName: "tasksPage"; Layout.fillWidth: true; text: "课程任务"; iconName: "list"; selected: window.currentPage === 0; onClicked: window.currentPage = 0 }
-                NavItem { objectName: "logsPage"; Layout.fillWidth: true; text: "运行日志"; iconName: "logs"; selected: window.currentPage === 1; onClicked: window.currentPage = 1 }
+                NavItem { objectName: "tasksPage"; Layout.fillWidth: true; text: "课程任务"; iconName: "list"; enabled: !window.setupMode; selected: window.currentPage === 0; onClicked: window.currentPage = 0 }
+                NavItem { objectName: "logsPage"; Layout.fillWidth: true; text: "运行日志"; iconName: "logs"; enabled: !window.setupMode; selected: window.currentPage === 1; onClicked: window.currentPage = 1 }
+                NavItem { objectName: "settingsPage"; Layout.fillWidth: true; text: "设置"; iconName: "account"; selected: window.currentPage === 2; onClicked: window.currentPage = 2 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line; Layout.topMargin: 16; Layout.bottomMargin: 12 }
                 RowLayout {
                     Layout.fillWidth: true; Layout.leftMargin: 8; Layout.rightMargin: 8; Layout.bottomMargin: 8
@@ -90,7 +93,7 @@ ApplicationWindow {
                     UiText { text: workbench.units.length ? workbench.units.length + " 个单元" : "待扫描"; color: Theme.muted; font.pixelSize: 13 }
                 }
                 NavItem {
-                    objectName: "allUnits"; Layout.fillWidth: true; text: "全部单元"; iconName: "layers"
+                    objectName: "allUnits"; Layout.fillWidth: true; text: "全部单元"; iconName: "layers"; enabled: !window.setupMode
                     selected: window.currentPage === 0 && workbench.activeUnit === "all"
                     count: summary.total > 0 ? summary.total : ""
                     onClicked: { workbench.chooseUnit("all"); window.currentPage = 0; window.resetTaskPosition() }
@@ -169,12 +172,13 @@ ApplicationWindow {
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 4
                     UiText {
-                        text: window.currentPage === 1 ? "运行日志" : workbench.activeUnit === "all" ? "全部课程任务" : workbench.activeUnit
+                        text: window.currentPage === 2 ? "设置" : window.currentPage === 1 ? "运行日志" : workbench.activeUnit === "all" ? "全部课程任务" : workbench.activeUnit
                         font.pixelSize: window.compactHeight ? 28 : 30; font.weight: Font.DemiBold; Layout.fillWidth: true
                     }
                     UiText { visible: window.currentPage === 0 && summary.unitTitle !== ""; text: summary.unitTitle; color: Theme.secondary; font.pixelSize: 13; Layout.fillWidth: true }
                 }
                 AccountSummary {
+                    visible: !window.setupMode
                     objectName: "accountDetails"; Layout.fillWidth: false; Layout.preferredWidth: window.width < 1100 ? 296 : 352
                     Layout.minimumWidth: 296; Layout.maximumWidth: Layout.preferredWidth
                     account: window.appState.account; model: window.appState.model; status: window.appState.status
@@ -187,6 +191,7 @@ ApplicationWindow {
                 counts: summary.counts; compact: window.width < 1100 || window.compactHeight
             }
             RowLayout {
+                visible: window.currentPage !== 2
                 Layout.fillWidth: true; Layout.bottomMargin: window.compactHeight ? 12 : 16; spacing: 12
                 ActionButton {
                     objectName: "scanAll"; visible: window.currentPage === 0; text: "扫描全部单元"; iconName: "refresh"; implicitHeight: window.compactHeight ? 36 : 40
@@ -206,7 +211,7 @@ ApplicationWindow {
                 ActionButton { objectName: "copyLogs"; visible: window.currentPage === 1; enabled: (window.appState.logs || []).length > 0; text: "复制日志"; iconName: "copy"; implicitHeight: 40; onClicked: workbench.copyLogs() }
             }
             Rectangle {
-                visible: !!window.appState.error || workbench.notice !== ""
+                visible: !window.setupMode && (!!window.appState.error || workbench.notice !== "")
                 Layout.fillWidth: true; implicitHeight: noticeText.implicitHeight + 24; Layout.bottomMargin: 12
                 color: Theme.surface; radius: 8; border.color: Theme.line
                 RowLayout {
@@ -367,6 +372,11 @@ ApplicationWindow {
                 }
             }
             Item { visible: window.currentPage === 1 && !window.busy; Layout.preferredHeight: 24 }
+            SettingsPage {
+                visible: window.currentPage === 2
+                firstRun: window.setupMode
+                Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 0
+            }
         }
     }
     Dialog {

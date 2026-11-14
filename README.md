@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">  
-  <img alt="Version" src="https://img.shields.io/badge/version-3.9.7-2561C7">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.9.8-2561C7">
   <img alt="GUI" src="https://img.shields.io/badge/gui-Qt_Quick-2561C7">
   <img alt="Browser" src="https://img.shields.io/badge/browser-Selenium-43B02A">
   <img alt="AI" src="https://img.shields.io/badge/api-OpenAI%20Compatible-111111">
@@ -24,18 +24,18 @@
 - **批量与单页处理**：可扫描全部单元或当前单元批量处理，也可直接处理当前页面。
 - **任务筛选**：默认选择未完成必修，支持搜索、状态筛选和排除不计分任务。
 - **断点续跑**：完成一项自动取消勾选，停止后保留剩余选择，方便继续处理。
-- **桌面工作台**：集中查看课程进度、任务列表和运行日志，附带独立配置编辑器。
+- **桌面工作台**：集中查看课程进度、任务列表和运行日志，内置「设置」页可随时修改配置。
 
 ---
 
 ## 项目结构
 
-根目录保留主入口、配置编辑器、配置、依赖清单与项目说明，辅助代码和资源按用途归类：
+根目录保留主入口、配置示例、依赖清单与项目说明，辅助代码和资源按用途归类：
 
 ```text
 UnipusAI-Helper/
 ├── UnipusAI_Helper.py          # 主程序入口
-├── config_editor.py           # 独立配置编辑器
+├── config_editor.py           # 旧版独立配置编辑器（源码保留，不再发布）
 ├── config.example.json        # 配置示例
 ├── config.json                # 本地配置（不提交）
 ├── requirements.txt           # Python 依赖
@@ -48,6 +48,7 @@ UnipusAI-Helper/
 │   ├── task_grading.py       # 计分状态识别与筛选
 │   ├── workbench_controller.py # 任务状态、调度与日志
 │   ├── native_ui.py          # Python / QML 桥接
+│   ├── settings.py            # 配置读写与内置设置页桥接
 │   ├── paths.py              # 项目与资源路径
 │   └── qml/                  # 原生界面组件、主题与图标
 ├── scripts/                  # macOS / Linux 辅助脚本
@@ -63,7 +64,6 @@ git clone https://github.com/YSJohnson/UnipusAI-Helper.git
 cd UnipusAI-Helper
 py -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe config_editor.py
 .venv\Scripts\python.exe UnipusAI_Helper.py
 ```
 
@@ -81,7 +81,7 @@ py -m venv .venv
 brew install ffmpeg                     # 语音转写需要
 brew install --cask microsoft-edge      # 程序驱动的是 Edge
 
-./scripts/config.sh                     # 打开配置编辑器，生成 config.json
+./scripts/config.sh                     # 启动主程序（首次自动进入设置页）
 .venv/bin/python UnipusAI_Helper.py      # 启动主程序
 ```
 
@@ -94,7 +94,7 @@ brew install --cask microsoft-edge      # 程序驱动的是 Edge
 
 ## 配置说明
 
-项目使用 `config.json` 作为本地配置文件，建议使用配置编辑器而不是手动修改。
+项目使用 `config.json` 作为本地配置文件。首次启动主程序会自动打开内置「设置」页填写账号与 API 信息，保存并重启后生效；平时点侧栏「设置」即可随时修改。
 
 ```json
 {
@@ -107,7 +107,10 @@ brew install --cask microsoft-edge      # 程序驱动的是 Edge
   "max_tokens": 32768,
   "temperature": 0.3,
   "token_full": "",
-  "debug_mode": false
+  "debug_mode": false,
+  "tts_engine": "auto",
+  "tts_voice": "",
+  "tts_proxy": ""
 }
 ```
 
@@ -133,7 +136,6 @@ brew install --cask microsoft-edge      # 程序驱动的是 Edge
 
 ## 使用指南
 
-1. 配置好基础信息，启动主程序并等待环境检查完成。
 2. 程序会自动打开浏览器并执行登录流程。
 3. 如果遇到验证码或人机验证，需要在浏览器中手动完成。
 4. 工作台右上角显示「就绪」即为登录成功。
@@ -165,6 +167,15 @@ brew install --cask microsoft-edge      # 程序驱动的是 Edge
 
 <details>
 <summary><b>点击展开完整更新日志</b></summary>
+
+<details>
+<summary><b>v3.9.8（2026-11-14）</b>：配置编辑合并进主程序 / 单一可执行程序</summary>
+
+- **内置设置页**：配置编辑合并进主工作台，统一使用 PySide6 / QML，新增侧栏「设置」页，可随时修改 config.json；保存后重启生效。
+- **单一程序**：发布版只出一个 exe、一个窗口、一个进程；首次启动若未配置 API Key，自动进入设置页，不会先启动浏览器，也不会因空密钥报错。
+- **旧版编辑器**：独立 config_editor.py（PyQt5 / Fluent Widgets）仅保留源码，不再单独发布，也不再是默认依赖。
+
+</details>
 
 <details>
 <summary><b>v3.9.7（2026-11-13）</b>：新版视听说课程适配 / 录音与学习进度修复</summary>

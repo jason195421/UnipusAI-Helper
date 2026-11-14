@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for the UnipusAI-Helper main application (onedir, console)."""
+"""PyInstaller spec for UnipusAI-Helper (single onedir exe, console; settings built in)."""
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 datas = [('unipus_helper/qml', 'unipus_helper/qml')]
@@ -28,6 +28,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
+    # 配置编辑已合并进主程序的 PySide6 / QML 设置页；旧版 PyQt5 编辑器不再打包。
     excludes=['PyQt5', 'qfluentwidgets'],
     noarchive=False,
     optimize=0,

@@ -97,7 +97,7 @@ gui_log_queue = queue.Queue()
 
 DEBUG_MODE = False
 
-APP_VERSION = "3.9.7"
+APP_VERSION = "3.9.8"
 
 DEFAULT_LOGIN_URL = "https://uai.unipus.cn/sso/index.html?service=https%3A%2F%2Fucloud.unipus.cn%2Fhome"
 UCLOUD_HOME_URL = "https://ucloud.unipus.cn/home"
@@ -11665,6 +11665,20 @@ if __name__ == '__main__':
         print("   - 如检查通过但无法启动，使用 --skip-check 跳过")
 
     logger = setup_logging()
+
+    # 配置为空时先进入内置「设置」页，避免空 api_key 触发 OpenAI 报错或先启动 Edge。
+    from unipus_helper.settings import is_config_ready
+    if not is_config_ready():
+        print("\n 首次启动：请在打开的设置页填写配置，保存后重新启动程序。")
+        from unipus_helper.native_ui import run_setup_mode
+        try:
+            run_setup_mode()
+        except Exception as exc:
+            print(f"\n 设置界面启动失败: {exc}")
+            logger.exception("设置界面启动失败")
+            sys.exit(1)
+        print("配置已保存，请重新启动程序。")
+        sys.exit(0)
 
     bot = None
     exit_code = 0

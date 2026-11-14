@@ -10,4 +10,5 @@ if [ ! -d ".venv" ]; then
 fi
 
 source .venv/bin/activate
-exec python config_editor.py "$@"
+# 配置编辑已合并进主程序；首次启动自动进入内置「设置」页填写 config.json。
+exec python UnipusAI_Helper.py "$@"
