@@ -1,4 +1,14 @@
-import hashlib, json, logging, os, sys, random, re, tempfile, threading, time, base64
+import hashlib
+import json
+import logging
+import os
+import sys
+import random
+import re
+import tempfile
+import threading
+import time
+import base64
 try:
     import winsound
 except ImportError:
@@ -226,7 +236,6 @@ ensure_writable_temp_dir()
 
 from unipus_helper.audio_recognizer import AudioTranscriber
 from unipus_helper.environment_checker import EnvironmentChecker
-from openai import OpenAI
 from selenium import webdriver
 from selenium.common.exceptions import (NoSuchElementException, TimeoutException,
                                         StaleElementReferenceException,
@@ -238,7 +247,29 @@ from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-gui_log_queue = queue.Queue()
+class _LogQueue(queue.Queue):
+    """GUI 日志队列：满了就丢最旧的一条，绝不阻塞调用方。
+
+    原来是无界 Queue，一旦 GUI 那边的收集线程意外退出，长时间运行会一直堆积
+    （每条日志一个字符串）吃满内存；现在封顶 maxsize，保留最新日志。
+    """
+
+    def __init__(self, maxsize: int = 5000):
+        super().__init__(maxsize=maxsize)
+
+    def put(self, item, block=True, timeout=None):
+        while True:
+            try:
+                super().put(item, block=False)
+                return
+            except queue.Full:
+                try:
+                    super().get_nowait()
+                except queue.Empty:
+                    pass
+
+
+gui_log_queue = _LogQueue()
 
 DEBUG_MODE = False
 
@@ -262,7 +293,7 @@ def setup_logging():
             for old_file in log_files:
                 try:
                     os.remove(old_file)
-                except:
+                except Exception:
                     pass
         except Exception:
             pass
@@ -338,6 +369,37 @@ def setup_logging():
 
     sys.stdout = PrintRedirector(logger)
     return logger
+
+
+def log_failure(prefix: str, exc: BaseException, *, limit: int = 50) -> str:
+    """控制台只打一行简短错误，完整堆栈写进日志文件；返回错误文本。
+
+    统一散落各处的「print 截断信息 + logger.error 全量堆栈」写法：
+    原来 11 处各写两行且格式略有出入，集中后改一处即可全局生效。
+    """
+    message = str(exc)
+    print(f"{prefix}{message[:limit]}")
+    logger.error("详细错误: %s", message, exc_info=True)
+    return message
+
+
+OPTION_LETTER_SELECTORS = ('.caption', '.index', '.option-label', '.choice-label')
+
+
+def read_option_letter(option_elem, selectors=OPTION_LETTER_SELECTORS) -> str:
+    """读取选项上的字母标记（.caption / .index 等），读不到返回空串。
+
+    播放器题目与弹窗题目各有选择器顺序，调用方可传自己的元组。
+    """
+    for selector in selectors:
+        try:
+            text = option_elem.find_element(By.CSS_SELECTOR, selector).text
+        except Exception:
+            continue
+        letter = text.strip().replace('.', '').replace(')', '').upper()
+        if letter:
+            return letter
+    return ""
 
 
 @dataclass(frozen=True)
@@ -600,6 +662,25 @@ def has_visible_dropdown(driver, root) -> bool:
     return bool(find_dropdown_triggers(driver, root))
 
 
+DIRECTION_SELECTOR = '.layout-direction-container, .abs-direction'
+
+
+def read_direction_text(driver, fallback: str = "") -> str:
+    """读取题目说明（directions）文字并转小写；已有 fallback 时直接返回。
+
+    多个解析策略都要用「说明里有没有 listen / video / fill in」判断题型，
+    统一在这里读一次，避免每处各写一遍 try/find_element。
+    """
+    text = (fallback or "").lower()
+    if text:
+        return text
+    try:
+        element = driver.find_element(By.CSS_SELECTOR, DIRECTION_SELECTOR)
+        return (element.text or "").lower()
+    except Exception:
+        return ""
+
+
 # 「已给出的首字母」只可能是短短的字母串；这些常用词是句子里正常出现的词，不是提示
 PREFIX_STOPWORDS = {
     'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'for', 'with', 'by',
@@ -823,9 +904,7 @@ class WebDriverHelper:
                 if elements:
                     return elements
             except Exception as e:
-                error_msg = str(e)
-                print(f"操作失败: {error_msg[:50]}")  # 控制台只显示简短信息
-                logger.error(f"详细错误: {error_msg}", exc_info=True)  # 详细堆栈保存到文件
+                log_failure("操作失败: ", e)
                 continue
         return []
 
@@ -866,7 +945,7 @@ class WebDriverHelper:
 
                 try:
                     element.click()
-                except:
+                except Exception:
                     driver.execute_script("arguments[0].click();", element)
                 return True
 
@@ -878,10 +957,18 @@ class WebDriverHelper:
                 if i < retries - 1:
                     time.sleep(0.5)
                     continue
-                error_msg = str(e)
-                print(f"操作失败: {error_msg[:50]}")  # 控制台只显示简短信息
-                logger.error(f"详细错误: {error_msg}", exc_info=True)  # 详细堆栈保存到文件
+                log_failure("操作失败: ", e)
         return False
+
+
+def build_openai_client(api_key: str, base_url: str):
+    """按需导入 openai 并创建客户端。
+
+    openai 的导入约 0.5s，只在真正需要调用大模型时才付出这个代价。
+    """
+    from openai import OpenAI
+
+    return OpenAI(api_key=api_key, base_url=base_url)
 
 
 class OpenAICompatibleClient:
@@ -898,7 +985,7 @@ class OpenAICompatibleClient:
 
     def __init__(self, config: Config):
         self.config = config
-        self.client = OpenAI(api_key=config.api_key, base_url=config.base_url)
+        self.client = build_openai_client(config.api_key, config.base_url)
         self.conversation_history: List[Dict] = []
         self.material_messages: List[Dict] = []  # 材料独立保留，不随问答窗口裁剪
         self.current_chapter_id: Optional[str] = None
@@ -1072,16 +1159,16 @@ class OpenAICompatibleClient:
                             print(f"   HTTP 状态码: {e.response.status_code}")
                             print(f"   响应头: {dict(e.response.headers)}")
                             print(f"   响应体: {e.response.text[:1000]}")
-                        except:
+                        except Exception:
                             pass
                     if hasattr(e, 'body'):
                         try:
                             print(f"   错误body: {e.body}")
-                        except:
+                        except Exception:
                             pass
                     if hasattr(e, 'status_code'):
                         print(f"   status_code: {e.status_code}")
-                    print(f"   完整堆栈:")
+                    print("   完整堆栈:")
                     traceback.print_exc()
                     print("=" * 60 + "\n")
 
@@ -1092,9 +1179,7 @@ class OpenAICompatibleClient:
                             return None
                     else:
                         time.sleep(delay)
-                error_msg = str(e)
-                print(f"AI调用失败: {error_msg[:50]}")  # 控制台只显示简短信息
-                logger.error(f"详细错误: {error_msg}", exc_info=True)  # 详细堆栈保存到文件
+                log_failure("AI调用失败: ", e)
 
         return None
 
@@ -1168,7 +1253,7 @@ class QuestionParser:
                     ".layout-direction-container .component-htmlview"
                 )
                 direction_text = direction_elem.text.lower()
-            except:
+            except Exception:
                 pass
 
             is_multi_question_type = any(kw in direction_text for kw in [
@@ -1203,7 +1288,7 @@ class QuestionParser:
                         try:
                             if reply.is_displayed() and reply.find_elements(By.CSS_SELECTOR, '.question-inputbox'):
                                 valid_replies.append(reply)
-                        except:
+                        except Exception:
                             continue
 
                     if len(valid_replies) >= 2:
@@ -1223,7 +1308,7 @@ class QuestionParser:
                 ".layout-direction-container .component-htmlview"
             )
             return direction_elem.text.strip()
-        except:
+        except Exception:
             pass
 
         try:
@@ -1232,7 +1317,7 @@ class QuestionParser:
                 ".abs-direction .content"
             )
             return direction_elem.text.strip()
-        except:
+        except Exception:
             pass
 
         try:
@@ -1241,7 +1326,7 @@ class QuestionParser:
                 ".direction-container"
             )
             return direction_elem.text.strip()
-        except:
+        except Exception:
             pass
 
         return ""
@@ -1288,9 +1373,7 @@ class QuestionParser:
                     print(f"      容器 {idx} 解析为None")
 
             except Exception as e:
-                error_msg = str(e)
-                print(f"       解析容器 {idx} 失败:{error_msg[:50]}")
-                logger.error(f"详细错误: {error_msg}", exc_info=True)
+                log_failure(f"       解析容器 {idx} 失败:", e)
                 continue
 
         return questions, directions
@@ -1315,9 +1398,7 @@ class QuestionParser:
                 return True
             return False
         except Exception as e:
-            error_msg = str(e)
-            print(f"操作失败: {error_msg[:50]}")
-            logger.error(f"详细错误: {error_msg}", exc_info=True)
+            log_failure("操作失败: ", e)
             return False
 
     def _find_containers(self) -> List[Any]:
@@ -1370,7 +1451,7 @@ class QuestionParser:
             try:
                 if reply.is_displayed() and reply.find_elements(By.CSS_SELECTOR, '.sequence-view, .sortable-list-wrapper'):
                     sequence_containers.append(reply)
-            except:
+            except Exception:
                 continue
         if sequence_containers:
             print(f"     找到 {len(sequence_containers)} 道排序题")
@@ -1389,7 +1470,7 @@ class QuestionParser:
                                                 './parent::div[contains(@class, "question-common-abs-reply")]')
                     if reply not in reply_containers:
                         reply_containers.append(reply)
-                except:
+                except Exception:
                     pass
 
             if reply_containers:
@@ -1418,7 +1499,7 @@ class QuestionParser:
                 has_got_it = 'got it' in container.text.lower()
                 if has_table and has_got_it and container.is_displayed():
                     self_check_containers.append(container)
-            except:
+            except Exception:
                 continue
 
         if self_check_containers:
@@ -1434,7 +1515,7 @@ class QuestionParser:
                 has_questions = container.find_elements(By.CSS_SELECTOR,
                                                         '.question-common-abs-choice, .question-inputbox, .option, .fe-scoop')
                 if not has_questions:
-                    print(f"     找到纯视频容器")
+                    print("     找到纯视频容器")
                     return [container]
 
         containers = self.driver.find_elements(By.CSS_SELECTOR, '.layout-container')
@@ -1451,7 +1532,7 @@ class QuestionParser:
                     has_content = has_visible_dropdown(self.driver, c)
                 if has_content and c.is_displayed():
                     valid_containers.append(c)
-            except:
+            except Exception:
                 continue
 
         if valid_containers:
@@ -1532,11 +1613,11 @@ class QuestionParser:
                     )
                     if parent_display == 'none':
                         return False
-                except:
+                except Exception:
                     break
 
             return True
-        except:
+        except Exception:
             return False
 
     def _parse_single(self, container, number: int, directions: str = "") -> Optional[Question]:
@@ -1552,13 +1633,11 @@ class QuestionParser:
                         print(f"      解析成功: {question.q_type.name}")
                         return question
                     else:
-                        print(f"      策略返回None")
+                        print("      策略返回None")
             except Exception as e:
-                error_msg = str(e)
-                print(f"      策略 {strategy.__class__.__name__} 失败: {error_msg[:50]} ")
-                logger.error(f"详细错误: {error_msg}", exc_info=True)
+                log_failure(f"      策略 {strategy.__class__.__name__} 失败: ", e)
                 continue
-        print(f"      没有匹配的策略")
+        print("      没有匹配的策略")
         return None
 
 
@@ -1608,12 +1687,7 @@ class SelfCheckStrategy(QuestionParserStrategy):
     """Self-check 词汇勾选表解析策略"""
 
     def can_parse(self, container, driver) -> bool:
-        direction_text = ""
-        try:
-            direction_elem = driver.find_element(By.CSS_SELECTOR, '.layout-direction-container, .abs-direction')
-            direction_text = direction_elem.text.lower()
-        except:
-            pass
+        direction_text = read_direction_text(driver)
 
         has_table = bool(container.find_elements(By.CSS_SELECTOR, '.ticket-view table, .ant-table-tbody'))
         has_got_it = 'got it' in container.text.lower()
@@ -1630,7 +1704,7 @@ class SelfCheckStrategy(QuestionParserStrategy):
                 got_it_icon = row.find_element(By.CSS_SELECTOR, 'td:nth-child(2) .anticon')
                 if word and got_it_icon:
                     rows.append({'word': word, 'element': got_it_icon})
-            except:
+            except Exception:
                 continue
 
         return Question(
@@ -1666,7 +1740,7 @@ class SortingStrategy(QuestionParserStrategy):
                     letter = spans[0].text.strip().replace('.', '').replace(')', '').upper()
                     if len(spans) > 1:
                         text = spans[1].text.strip()
-            except:
+            except Exception:
                 pass
 
             if not letter:
@@ -1822,17 +1896,17 @@ class BankedClozeStrategy(QuestionParserStrategy):
                     return (clone.textContent || '').trim();
                 """, context_elem) or ""
                 context = re.sub(r'\s+', ' ', context).strip()
-            except:
+            except Exception:
                 try:
                     context = scoop.text.strip()
-                except:
+                except Exception:
                     context = ""
 
             input_box = None
             try:
                 input_box = scoop.find_element(By.CSS_SELECTOR, 'input')
                 inputs.append(input_box)
-            except:
+            except Exception:
                 pass
 
             banked_blanks.append({
@@ -1869,26 +1943,14 @@ class BankedClozeStrategy(QuestionParserStrategy):
 
 class StandardChoiceStrategy(QuestionParserStrategy):
     def _is_listening_choice_page(self, driver, directions: str = "") -> bool:
-        direction_text = (directions or "").lower()
-        if not direction_text:
-            try:
-                direction_elem = driver.find_element(By.CSS_SELECTOR, '.layout-direction-container, .abs-direction')
-                direction_text = direction_elem.text.lower()
-            except:
-                direction_text = ""
+        direction_text = read_direction_text(driver, directions)
 
         has_listening_hint = any(kw in direction_text for kw in ['listen', 'audio', 'hear', 'conversation', 'passage', 'news'])
         has_choice_hint = any(kw in direction_text for kw in ['choose', 'answer', 'best answer'])
         return has_listening_hint and has_choice_hint
 
     def _is_video_choice_page(self, driver, directions: str = "") -> bool:
-        direction_text = (directions or "").lower()
-        if not direction_text:
-            try:
-                direction_elem = driver.find_element(By.CSS_SELECTOR, '.layout-direction-container, .abs-direction')
-                direction_text = direction_elem.text.lower()
-            except:
-                direction_text = ""
+        direction_text = read_direction_text(driver, directions)
 
         has_video_hint = any(kw in direction_text for kw in ['watch', 'video', 'clip'])
         has_choice_hint = any(kw in direction_text for kw in ['choose', 'answer', 'decide', 'true or false', 'statements'])
@@ -1990,7 +2052,7 @@ class MyVoiceTextStrategy(QuestionParserStrategy):
                 for elem in container.find_elements(By.CSS_SELECTOR, selector):
                     if elem.is_displayed():
                         return elem
-            except:
+            except Exception:
                 continue
         return None
 
@@ -2001,7 +2063,7 @@ class MyVoiceTextStrategy(QuestionParserStrategy):
                 text = source.text.strip()
                 if text:
                     parts.append(text)
-            except:
+            except Exception:
                 pass
         return "\n".join(parts)
 
@@ -2017,7 +2079,7 @@ class MyVoiceTextStrategy(QuestionParserStrategy):
                 text = elem.text.strip()
                 if text:
                     return text
-            except:
+            except Exception:
                 continue
 
         for selector in selectors:
@@ -2026,7 +2088,7 @@ class MyVoiceTextStrategy(QuestionParserStrategy):
                 text = elem.text.strip()
                 if text:
                     return text
-            except:
+            except Exception:
                 continue
         return ""
 
@@ -2890,7 +2952,7 @@ class TextInputStrategy(QuestionParserStrategy):
             try:
                 material = container.find_element(By.CSS_SELECTOR, '.layout-material-container')
                 material_text = material.text.lower()
-            except:
+            except Exception:
                 pass
 
             if any(kw in material_text for kw in self.WRITING_KEYWORDS):
@@ -2905,7 +2967,7 @@ class TextInputStrategy(QuestionParserStrategy):
         try:
             direction_elem = driver.find_element(By.CSS_SELECTOR, '.layout-direction-container .component-htmlview')
             direction_text = direction_elem.text.lower()
-        except:
+        except Exception:
             direction_elem = WebDriverHelper.safe_find_element(
                 driver, ['.layout-direction-container .content', '.abs-direction .content'], container)
             if direction_elem:
@@ -2947,7 +3009,7 @@ class TextInputStrategy(QuestionParserStrategy):
                     direction_elem = driver.find_element(By.CSS_SELECTOR,
                                                          ".layout-direction-container .component-htmlview")
                     effective_directions = direction_elem.text.strip()
-                except:
+                except Exception:
                     pass
 
             container_class = container.get_attribute('class') or ''
@@ -2986,19 +3048,16 @@ class TextInputStrategy(QuestionParserStrategy):
                             'input': textarea,
                             'question_text': placeholder
                         })
-                    except Exception as e:
+                    except Exception:
                         continue
             else:
-                if is_single_reply:
-                    input_boxes = container.find_elements(By.CSS_SELECTOR, '.question-inputbox')
-                else:
-                    input_boxes = container.find_elements(By.CSS_SELECTOR, '.question-inputbox')
+                input_boxes = container.find_elements(By.CSS_SELECTOR, '.question-inputbox')
 
                 for i, box in enumerate(input_boxes, question_number):
                     try:
                         header = box.find_element(By.CSS_SELECTOR, '.question-inputbox-header')
                         question_text = header.text.strip()
-                        question_text = re.sub(rf'^\d+[\s.、)]+', '', question_text)
+                        question_text = re.sub(r'^\d+[\s.、)]+', '', question_text)
 
                         textarea = box.find_element(By.CSS_SELECTOR, 'textarea')
 
@@ -3008,7 +3067,7 @@ class TextInputStrategy(QuestionParserStrategy):
                             'input': textarea,
                             'question_text': question_text
                         })
-                    except Exception as e:
+                    except Exception:
                         continue
 
             if not items:
@@ -3054,9 +3113,7 @@ class TextInputStrategy(QuestionParserStrategy):
             )
 
         except Exception as e:
-            error_msg = str(e)
-            print(f"      TextInputStrategy解析失败: {error_msg[:100]}")
-            logger.error(f"详细错误: {error_msg}", exc_info=True)
+            log_failure("      TextInputStrategy解析失败: ", e, limit=100)
             return None
 
     def _check_is_writing_by_material(self, container=None, driver=None) -> bool:
@@ -3073,15 +3130,15 @@ class TextInputStrategy(QuestionParserStrategy):
                 try:
                     material = container.find_element(By.CSS_SELECTOR, '.layout-material-container')
                     material_text = material.text.strip()
-                except:
+                except Exception:
                     pass
             if not material_text and driver:
                 try:
                     material = driver.find_element(By.CSS_SELECTOR, '.layout-material-container')
                     material_text = material.text.strip()
-                except:
+                except Exception:
                     pass
-        except:
+        except Exception:
             pass
         return material_text
 
@@ -3095,19 +3152,15 @@ class ListeningFillInStrategy(QuestionParserStrategy):
         if not has_blanks or has_option_pool:
             return False
 
-        try:
-            direction = driver.find_element(By.CSS_SELECTOR, '.layout-direction-container, .abs-direction')
-            text = direction.text.lower()
-            has_media_hint = any(kw in text for kw in [
-                'listen', 'audio', 'hear', 'talk', 'conversation',
-                'watch', 'video', 'clip', 'view'
-            ])
-            has_fill_hint = any(kw in text for kw in [
-                'fill in', 'complete', 'blank', 'blanks'
-            ])
-            return has_media_hint and has_fill_hint
-        except:
-            return False
+        text = read_direction_text(driver)
+        has_media_hint = any(kw in text for kw in [
+            'listen', 'audio', 'hear', 'talk', 'conversation',
+            'watch', 'video', 'clip', 'view'
+        ])
+        has_fill_hint = any(kw in text for kw in [
+            'fill in', 'complete', 'blank', 'blanks'
+        ])
+        return has_media_hint and has_fill_hint
 
     def parse(self, container, driver, question_number: int, directions: str = "") -> Optional[Question]:
         inputs = container.find_elements(By.CSS_SELECTOR, '.fe-scoop input')
@@ -3124,7 +3177,7 @@ class ListeningFillInStrategy(QuestionParserStrategy):
             try:
                 scoop = inp.find_element(By.XPATH, './ancestor::span[@class="fe-scoop"]')
                 sentence = self._extract_blank_sentence(scoop)
-            except:
+            except Exception:
                 sentence = ""
             left_context, right_context = self._split_blank_context(sentence, i + 1)
             blank_contexts.append({
@@ -3156,7 +3209,7 @@ class ListeningFillInStrategy(QuestionParserStrategy):
                 text = scoop.find_element(By.XPATH, xpath).text.strip()
                 if text:
                     return text
-            except:
+            except Exception:
                 continue
         return ""
 
@@ -3487,7 +3540,7 @@ class DropdownSelectStrategy(QuestionParserStrategy):
                     text = opt.text.strip()
                     if text and text not in options:
                         options.append(text)
-            except:
+            except Exception:
                 try:
                     select = elem.find_element(By.TAG_NAME, 'select')
                     option_elems = select.find_elements(By.TAG_NAME, 'option')
@@ -3495,7 +3548,7 @@ class DropdownSelectStrategy(QuestionParserStrategy):
                         text = opt.text.strip()
                         if text and text not in ['', CLOZE_DROPDOWN_PLACEHOLDER]:
                             options.append(text)
-                except:
+                except Exception:
                     pass
 
             blanks.append({
@@ -4683,7 +4736,7 @@ class AnswerExecutor:
                 opt = q.options[idx]
                 print(f"\t通过索引匹配选项 {opt.letter}: {opt.text[:30]}...")
                 return WebDriverHelper.safe_click(self.driver, opt.element)
-        except:
+        except Exception:
             pass
 
         return False
@@ -4754,7 +4807,7 @@ class AnswerExecutor:
                 spans = elem.find_elements(By.TAG_NAME, 'span')
                 if spans:
                     letter = spans[0].text.strip().replace('.', '').replace(')', '').upper()
-            except:
+            except Exception:
                 pass
             if not letter:
                 match = re.match(r'^([A-Z])[\s.、)]*', text)
@@ -4858,7 +4911,7 @@ class AnswerExecutor:
 
         success_count = 0
 
-        for i, (blank, word) in enumerate(zip(q.banked_blanks, words)):
+        for i, (blank, word) in enumerate(zip(q.banked_blanks, words, strict=False)):
             if blank['input'] and word:
                 try:
                     clean_word = word.strip()
@@ -4887,9 +4940,7 @@ class AnswerExecutor:
                     success_count += 1
 
                 except Exception as e:
-                    error_msg = str(e)
-                    print(f"      填空 {i + 1} 失败:{error_msg[:50]} ")
-                    logger.error(f"详细错误: {error_msg}", exc_info=True)
+                    log_failure(f"      填空 {i + 1} 失败:", e)
 
         return bool(q.banked_blanks) and success_count == len(q.banked_blanks)
 
@@ -5003,7 +5054,7 @@ class AnswerExecutor:
         if match:
             return cls._clean_extracted_answer(match.group(1))
 
-        lines = [l.strip() for l in answer.split('\n') if l.strip()]
+        lines = [ln.strip() for ln in answer.split('\n') if ln.strip()]
         for line in lines:
             clean = re.sub(
                 rf'^(?:{cls.ANSWER_LABEL_PATTERN}\s*[：:]\s*)?(?:{cls.NUMBER_PREFIX_PATTERN})\s*',
@@ -5490,7 +5541,7 @@ class AnswerExecutor:
         else:
             answers = self._parse_banked_answer(answer, expected_count)
             success_count = 0
-            for idx, (inp, ans) in enumerate(zip(q.inputs, answers), 1):
+            for idx, (inp, ans) in enumerate(zip(q.inputs, answers, strict=False), 1):
                 if not ans:
                     print(f"\t题{idx}: (空)")
                     continue
@@ -5559,7 +5610,7 @@ class AnswerExecutor:
         try:
             current = inp.get_attribute('value') or ''
             return current.strip() == ans.strip()
-        except:
+        except Exception:
             return False
 
     def _upload_my_voice_answer_file(self, q: Question, answer: str) -> bool:
@@ -5588,7 +5639,7 @@ class AnswerExecutor:
         try:
             media_list = q.element.find_element(By.CSS_SELECTOR, '.question-multi-file-upload .media-list')
             return bool(media_list.find_elements(By.XPATH, './*')) or bool(media_list.text.strip())
-        except:
+        except Exception:
             return False
 
     def _wait_my_voice_upload_ready(self, q: Question, timeout: int = 12) -> bool:
@@ -5807,7 +5858,7 @@ class AnswerExecutor:
                 for btn in btns:
                     if btn.is_displayed() and btn.is_enabled() and self._is_submit_button(btn):
                         return WebDriverHelper.safe_click(self.driver, btn)
-            except:
+            except Exception:
                 continue
 
         for selector in Selectors.SUBMIT_BUTTON:
@@ -5816,7 +5867,7 @@ class AnswerExecutor:
                 for btn in btns:
                     if btn.is_displayed() and btn.is_enabled() and self._is_submit_button(btn):
                         return WebDriverHelper.safe_click(self.driver, btn)
-            except:
+            except Exception:
                 continue
 
         # 老播放器底部「提 交」是个 div.btn（不是 button），上面的选择器容易漏掉；
@@ -5895,7 +5946,7 @@ class AnswerExecutor:
         if matched_any:
             return result
 
-        print(f"    [调试] 题号匹配完全失效，启动降级切分模式")
+        print("    [调试] 题号匹配完全失效，启动降级切分模式")
         lines = [line.strip() for line in answer.split('\n') if line.strip()]
         content_lines = []
 
@@ -5921,7 +5972,7 @@ class AnswerExecutor:
 
         success_count = 0
 
-        for i, (blank, ans) in enumerate(zip(q.banked_blanks, answers)):
+        for i, (blank, ans) in enumerate(zip(q.banked_blanks, answers, strict=False)):
             if not ans:
                 continue
 
@@ -5945,7 +5996,7 @@ class AnswerExecutor:
 
                 actions = ActionChains(self.driver)
                 actions.move_to_element(trigger).click().perform()
-                print(f"         点击触发器打开下拉")
+                print("         点击触发器打开下拉")
                 time.sleep(0.8)
 
                 dropdown_menu = None
@@ -5961,12 +6012,12 @@ class AnswerExecutor:
                         )
                         if dropdown_menu.is_displayed():
                             break
-                    except:
+                    except Exception:
                         pass
                     time.sleep(0.3)
 
                 if not dropdown_menu:
-                    print(f"         下拉菜单未出现，尝试备选方案")
+                    print("         下拉菜单未出现，尝试备选方案")
                     if self._force_select_by_js(select_wrapper, ans):
                         success_count += 1
                     continue
@@ -5993,7 +6044,7 @@ class AnswerExecutor:
                                 break
                         if option_clicked:
                             break
-                    except Exception as e:
+                    except Exception:
                         continue
 
                 if not option_clicked:
@@ -6021,10 +6072,10 @@ class AnswerExecutor:
                             option = self.driver.find_element(By.XPATH, xpath)
                             if option.is_displayed():
                                 ActionChains(self.driver).move_to_element(option).click().perform()
-                                print(f"         XPath点击选项")
+                                print("         XPath点击选项")
                                 option_clicked = True
                                 break
-                        except:
+                        except Exception:
                             continue
 
                 if option_clicked:
@@ -6065,7 +6116,7 @@ class AnswerExecutor:
         print(f"\t输入框数量: {len(q.inputs)}")
 
         success_count = 0
-        for i, (blank_info, ans) in enumerate(zip(q.banked_blanks, answers)):
+        for i, (blank_info, ans) in enumerate(zip(q.banked_blanks, answers, strict=False)):
             if ans and blank_info['input']:
                 original_ans = ans
                 ans = self._normalize_listening_blank_answer(blank_info, ans)
@@ -6216,7 +6267,7 @@ class AnswerExecutor:
             return true;
             """
             return self.driver.execute_script(js, select_wrapper, value)
-        except:
+        except Exception:
             return False
 
 
@@ -6481,7 +6532,22 @@ class PublishTaskScope:
              [state['element'] for state in groups])
         if result is None:
             raise ValueError('当前任务文档或边界已变化，停止作答以免越界')
-        return [state for state, included in zip(groups, result) if included]
+        return [state for state, included in zip(groups, result, strict=False) if included]
+
+
+def find_group_submit_button(group):
+    """题目组内的提交按钮：优先可见的那个，都不可见时退回第一个。"""
+    try:
+        buttons = group.find_elements(By.CSS_SELECTOR, PublishPlayer.SUBMIT_CSS)
+    except Exception:
+        return None
+    for button in buttons:
+        try:
+            if button.is_displayed():
+                return button
+        except Exception:
+            continue
+    return buttons[0] if buttons else None
 
 
 class PublishQuestionParser:
@@ -6561,17 +6627,7 @@ class PublishQuestionParser:
         return groups
 
     def submit_button(self, group):
-        try:
-            buttons = group.find_elements(By.CSS_SELECTOR, PublishPlayer.SUBMIT_CSS)
-        except Exception:
-            return None
-        for button in buttons:
-            try:
-                if button.is_displayed():
-                    return button
-            except Exception:
-                continue
-        return buttons[0] if buttons else None
+        return find_group_submit_button(group)
 
     def group_submitted(self, group) -> bool:
         """已批改/已提交的题目组不再重复作答。"""
@@ -7192,7 +7248,7 @@ class PublishAnswerExecutor(AnswerExecutor):
             return False
         started = False
         try:
-            prep = self.driver.execute_script("""
+            prep = self.driver.execute_script(r"""
                 const boxes = arguments[0].querySelectorAll('[class*="i-record-count-down_title-wrapper"]');
                 for (const box of boxes) {
                     const text = (box.innerText || '').replace(/\s/g, '');
@@ -7298,11 +7354,12 @@ class PublishAnswerExecutor(AnswerExecutor):
                     continue
                 if not WebDriverHelper.safe_click(self.driver, head):
                     return False
-                WebDriverWait(self.driver, 2).until(lambda driver: driver.execute_script("""
+                WebDriverWait(self.driver, 2).until(
+                    lambda driver, _content=content: driver.execute_script("""
                     const el = arguments[0], s = getComputedStyle(el);
                     return !el.hasAttribute('hidden') && s.display !== 'none' &&
                         s.contentVisibility !== 'hidden';
-                """, content))
+                """, _content))
             return True
         except Exception:
             return False
@@ -7462,7 +7519,7 @@ class PublishAnswerExecutor(AnswerExecutor):
         if not inputs or len(answers) != len(inputs) or not all(answers):
             print("\t答案不完整，不填写该题")
             return False
-        for index, (inp, answer) in enumerate(zip(inputs, answers), 1):
+        for index, (inp, answer) in enumerate(zip(inputs, answers, strict=False), 1):
             print(f"\t空{index}: {answer[:80]}")
             if not self._fill_text_input_verified(inp, answer):
                 print(f"\t空{index}: 写入后校验失败")
@@ -7542,7 +7599,7 @@ class PublishAnswerExecutor(AnswerExecutor):
             print("\t下拉填空答案不完整，不填写该题")
             return False
         filled = 0
-        for blank, value in zip(blanks, answers):
+        for blank, value in zip(blanks, answers, strict=False):
             if value and self._select_dropdown_value(blank, value):
                 filled += 1
         if filled < len(blanks):
@@ -7924,19 +7981,7 @@ class PublishAnswerExecutor(AnswerExecutor):
 
     # ---- 组内提交 -------------------------------------------------------
     def find_submit_button(self, group):
-        if group is None:
-            return None
-        try:
-            buttons = group.find_elements(By.CSS_SELECTOR, PublishPlayer.SUBMIT_CSS)
-        except Exception:
-            return None
-        for button in buttons:
-            try:
-                if button.is_displayed():
-                    return button
-            except Exception:
-                continue
-        return buttons[0] if buttons else None
+        return None if group is None else find_group_submit_button(group)
 
     @staticmethod
     def button_is_submitted(button) -> bool:
@@ -8360,7 +8405,7 @@ class SelfCheckHandler(ContentHandler):
                 word = ""
                 try:
                     word = row.find_element(By.CSS_SELECTOR, '.content-text').text.strip()
-                except:
+                except Exception:
                     pass
 
                 got_it_cell = row.find_element(By.CSS_SELECTOR, 'td:nth-child(2)')
@@ -8408,10 +8453,7 @@ class VideoHandler(ContentHandler):
 
         self.transcriber = AudioTranscriber()
 
-        self.analyzer_client = OpenAI(
-            api_key=config.api_key,
-            base_url=config.base_url
-        )
+        self.analyzer_client = build_openai_client(config.api_key, config.base_url)
 
         self.video_transcript = ""
         self.current_video_url = ""
@@ -8483,7 +8525,7 @@ class VideoHandler(ContentHandler):
                 'duration': duration or 0,
                 'element': video
             }
-        except:
+        except Exception:
             return None
 
     def _transcribe_video(self, video_url: str, duration: float) -> str:
@@ -8527,7 +8569,7 @@ class VideoHandler(ContentHandler):
                     arguments[0].muted = true;
                     arguments[0].play();
                 """, video)
-                print(f"      【等待】等待 10 秒...")
+                print("      【等待】等待 10 秒...")
                 self.stop_requested.wait(10)
 
         except Exception as e:
@@ -8584,7 +8626,7 @@ class VideoHandler(ContentHandler):
                     else:
                         print(f"      [监视器]  点击失败: {answer}")
 
-            except Exception as e:
+            except Exception:
                 pass
 
             self.stop_monitoring.wait(check_interval)
@@ -8608,7 +8650,7 @@ class VideoHandler(ContentHandler):
                         options = elem.find_elements(By.CSS_SELECTOR, '.option, .option-wrap .option')
                         if len(options) >= 2:
                             return elem
-            except:
+            except Exception:
                 continue
         return None
 
@@ -8616,7 +8658,7 @@ class VideoHandler(ContentHandler):
         try:
             text = popup.text
             return hashlib.md5(text[:200].encode()).hexdigest()[:16]
-        except:
+        except Exception:
             return str(time.time())
 
     def _parse_popup_question(self, popup) -> Optional[Dict]:
@@ -8629,7 +8671,7 @@ class VideoHandler(ContentHandler):
                     title = elem.text.strip()
                     if title:
                         break
-                except:
+                except Exception:
                     continue
 
             option_elems = popup.find_elements(By.CSS_SELECTOR,
@@ -8638,17 +8680,7 @@ class VideoHandler(ContentHandler):
             options = []
             for i, opt_elem in enumerate(option_elems):
                 try:
-                    letter_selectors = ['.caption', '.index', '.option-label', '.choice-label']
-                    letter = ""
-                    for sel in letter_selectors:
-                        try:
-                            letter_elem = opt_elem.find_element(By.CSS_SELECTOR, sel)
-                            letter = letter_elem.text.strip().replace('.', '').replace(')', '').upper()
-                            if letter:
-                                break
-                        except:
-                            continue
-
+                    letter = read_option_letter(opt_elem)
                     if not letter:
                         letter = chr(65 + i)
 
@@ -8660,7 +8692,7 @@ class VideoHandler(ContentHandler):
                             content = content_elem.text.strip()
                             if content:
                                 break
-                        except:
+                        except Exception:
                             continue
 
                     if not content:
@@ -8672,7 +8704,7 @@ class VideoHandler(ContentHandler):
                         'element': opt_elem
                     })
 
-                except:
+                except Exception:
                     continue
 
             if not options:
@@ -8788,17 +8820,7 @@ class VideoHandler(ContentHandler):
 
             for opt_elem in option_elems:
                 try:
-                    letter_selectors = ['.caption', '.index', '.option-label']
-                    letter = ""
-                    for sel in letter_selectors:
-                        try:
-                            letter_elem = opt_elem.find_element(By.CSS_SELECTOR, sel)
-                            letter = letter_elem.text.strip().replace('.', '').replace(')', '').upper()
-                            if letter:
-                                break
-                        except:
-                            continue
-
+                    letter = read_option_letter(opt_elem, ('.caption', '.index', '.option-label'))
                     if letter == answer.upper():
                         self.driver.execute_script(
                             "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});",
@@ -8808,12 +8830,12 @@ class VideoHandler(ContentHandler):
 
                         try:
                             opt_elem.click()
-                        except:
+                        except Exception:
                             self.driver.execute_script("arguments[0].click();", opt_elem)
 
                         return True
 
-                except:
+                except Exception:
                     continue
 
             try:
@@ -8827,7 +8849,7 @@ class VideoHandler(ContentHandler):
                     time.sleep(0.2)
                     opt_elem.click()
                     return True
-            except:
+            except Exception:
                 pass
 
             return False
@@ -8850,7 +8872,7 @@ class VideoHandler(ContentHandler):
                     btn.click()
                     print("      [监视器]  已提交")
                     return True
-            except:
+            except Exception:
                 continue
         return False
 
@@ -8868,7 +8890,7 @@ class VideoHandler(ContentHandler):
                 ended = self.driver.execute_script("return arguments[0].ended;", video)
 
                 if ended or current >= duration - 1:
-                    print(f"       视频播放完成")
+                    print("       视频播放完成")
                     break
 
                 elapsed = int(time.time() - start_time)
@@ -8879,20 +8901,17 @@ class VideoHandler(ContentHandler):
                 if self.stop_requested.wait(0.5):
                     break
 
-            except:
+            except Exception:
                 break
 
     def _check_video_completed(self) -> bool:
         try:
-            indicators = [
+            indicators = (
                 '.video-completed', '.watched', '.finished',
                 '[class*="completed"]', '[class*="finished"]'
-            ]
-            for indicator in indicators:
-                if self.driver.find_elements(By.CSS_SELECTOR, indicator):
-                    return True
-            return False
-        except:
+            )
+            return any(self.driver.find_elements(By.CSS_SELECTOR, indicator) for indicator in indicators)
+        except Exception:
             return False
 
 
@@ -8921,13 +8940,13 @@ class FlashcardHandler(ContentHandler):
                     print(f"      未找到下一个按钮，可能已完成（已点击{clicked}个）")
                     break
                 if not next_btn.is_displayed() or not next_btn.is_enabled():
-                    print(f"      按钮不可用，完成")
+                    print("      按钮不可用，完成")
                     break
                 try:
                     disabled_next_button = self.driver.find_element(By.CSS_SELECTOR, '.action.next.disabled')
                     if disabled_next_button:
                         break
-                except:
+                except Exception:
                     pass
                 self.driver.execute_script(
                     "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});",
@@ -8937,7 +8956,7 @@ class FlashcardHandler(ContentHandler):
                     return False
                 try:
                     next_btn.click()
-                except:
+                except Exception:
                     self.driver.execute_script("arguments[0].click();", next_btn)
                 clicked += 1
                 if self.stop_requested.wait(0.5):
@@ -8946,9 +8965,7 @@ class FlashcardHandler(ContentHandler):
                                                         '//*[@id="question-vocabulary-base-id"]/div/div[2]/div')
                 print(f" 学习{current_word.text}")
             except Exception as e:
-                error_msg = str(e)
-                print(f"      处理闪卡失败: {error_msg[:50]}")
-                logger.error(f"详细错误: {error_msg}", exc_info=True)
+                log_failure("      处理闪卡失败: ", e)
                 if self.stop_requested.wait(1):
                     return False
                 continue
@@ -8973,7 +8990,7 @@ class FlashcardHandler(ContentHandler):
                 for elem in elems:
                     if elem.is_displayed():
                         return elem
-            except:
+            except Exception:
                 continue
         return None
 
@@ -9175,7 +9192,7 @@ class AISolver:
         if self._should_stop():
             return 'stopped'
         if not WebDriverHelper.safe_click(self.driver, l1_tab['element']):
-            print(f"  点击一级Tab失败，跳过")
+            print("  点击一级Tab失败，跳过")
             return 'skipped'
         if self.stop_requested.wait(1.5):
             return 'stopped'
@@ -9194,7 +9211,7 @@ class AISolver:
         if self._should_stop():
             return 'stopped'
         if not WebDriverHelper.safe_click(self.driver, l2_tab['element']):
-            print(f"  点击二级Tab失败，跳过")
+            print("  点击二级Tab失败，跳过")
             return 'skipped'
         if self.stop_requested.wait(1.5):
             return 'stopped'
@@ -9784,7 +9801,7 @@ class AISolver:
         print(f"    内容标识: {hashlib.md5(content_hash.encode()).hexdigest()[:16]}...")
 
         if content_hash in self.processed_hashes:
-            print(f"   【跳过】已处理过，跳过")
+            print("   【跳过】已处理过，跳过")
             return False
 
         self.processed_hashes.add(content_hash)
@@ -9828,12 +9845,11 @@ class AISolver:
             current_signature = self._generate_questions_signature(questions)
 
             if current_signature == last_questions_signature and page_num > 1:
-                print(f"    题目内容与上次相同，可能已到达最后一页")
+                print("    题目内容与上次相同，可能已到达最后一页")
                 break
 
             last_questions_signature = current_signature
 
-            special_handled = False
             self_check_handled = False
             for q in questions:
                 if self._should_stop():
@@ -9848,18 +9864,16 @@ class AISolver:
                             if not handled or self._should_stop():
                                 self.processed_hashes.discard(content_hash)
                                 return False
-                            special_handled = True
                             break
                         if self._should_stop():
                             return False
-                        special_handled = True
                         if q.q_type == QuestionType.SELF_CHECK:
                             self_check_handled = True
                         if q.q_type in [QuestionType.VOCABULARY_FLASHCARD, QuestionType.VIDEO]:
-                            print(f"    特殊内容处理完成")
+                            print("    特殊内容处理完成")
                             return True
                         if q.q_type == QuestionType.DISCUSSION_BOARD:
-                            print(f"    讨论区已处理")
+                            print("    讨论区已处理")
                             return True
                         break
 
@@ -9982,25 +9996,25 @@ class AISolver:
                 self._handle_confirm_dialog()
             next_btn = self._find_next_question_button()
             if next_btn:
-                print(f"    点击下一题...")
+                print("    点击下一题...")
                 pre_click_signature = current_signature
 
                 if self._should_stop():
                     return False
                 if not WebDriverHelper.safe_click(self.driver, next_btn):
-                    print(f"    点击下一题失败")
+                    print("    点击下一题失败")
                     break
 
                 if not self._wait_for_content_change(pre_click_signature, timeout=5):
                     if self._should_stop():
                         return False
-                    print(f"    内容未变化，可能已到最后一页")
+                    print("    内容未变化，可能已到最后一页")
                     break
 
                 page_num += 1
 
                 if page_num > 50:
-                    print(f"    达到最大页数限制，停止")
+                    print("    达到最大页数限制，停止")
                     break
                 continue
 
@@ -10013,10 +10027,10 @@ class AISolver:
                 if self._should_stop():
                     return False
                 self._handle_confirm_dialog()
-                print(f"    已自动提交")
+                print("    已自动提交")
             elif total_questions:
-                print(f"    没找到可点击的提交按钮，请手动提交")
-            print(f"    没有更多题目了")
+                print("    没找到可点击的提交按钮，请手动提交")
+            print("    没有更多题目了")
             break
         print(f"    总共回答 {total_answered} 题")
         return True
@@ -10135,9 +10149,10 @@ class AISolver:
                     self.driver.execute_script('arguments[0].scrollIntoView({block:"center"});', wrapper)
                     tag = 'audio' if wrapper.get_attribute('data-lexical-node-type') == 'insert-audio' else 'video'
                     video = WebDriverWait(self.driver, 15).until(
-                        lambda d: wrapper.find_elements(By.TAG_NAME, tag) or False)[0]
+                        lambda d, _w=wrapper, _t=tag: _w.find_elements(By.TAG_NAME, _t) or False)[0]
                     duration = WebDriverWait(self.driver, 15).until(
-                        lambda d: d.execute_script('return Number.isFinite(arguments[0].duration) && arguments[0].duration || 0', video))
+                        lambda d, _v=video: d.execute_script(
+                            'return Number.isFinite(arguments[0].duration) && arguments[0].duration || 0', _v))
                     self.driver.execute_script('arguments[0].muted=true; arguments[0].playbackRate=2; arguments[0].play();', video)
                     print(f'    播放当前任务音视频（{int(duration)} 秒）')
                     deadline = time.monotonic() + duration + 60
@@ -10262,7 +10277,8 @@ class AISolver:
                     if '/course-v3:' in route and not scope.start_anchor:
                         raise ValueError('新版任务没有明确的正文锚点')
                     if task_name and not task_name.startswith('quick_current_page_') and scope.title:
-                        normalize = lambda text: re.sub(r'\s+', ' ', text).strip().casefold()
+                        def normalize(text):
+                            return re.sub(r'\s+', ' ', text).strip().casefold()
                         if normalize(task_name) != normalize(scope.title):
                             raise ValueError(f'打开的任务“{scope.title}”与勾选的“{task_name}”不一致')
                     if self._publish_current_url() != route:
@@ -10864,7 +10880,7 @@ class AISolver:
             return answer
         if re.search(AnswerExecutor.NUMBER_PREFIX_PATTERN, ai_response, re.IGNORECASE):
             return ""
-        lines = [l.strip() for l in ai_response.split('\n') if l.strip()]
+        lines = [ln.strip() for ln in ai_response.split('\n') if ln.strip()]
         if 1 <= question_number <= len(lines):
             return lines[question_number - 1]
         return ""
@@ -10903,7 +10919,7 @@ class AISolver:
         print(f"    内容标识: {state_key[:50]}...")
 
         if state_key in self.processed_hashes:
-            print(f"   【继续】该页面的哈希已被记录，正在执行作答...")
+            print("   【继续】该页面的哈希已被记录，正在执行作答...")
 
         self.processed_hashes.add(state_key)
 
@@ -10955,9 +10971,7 @@ class AISolver:
                         if any(k in text or k in aria_label for k in ['下一题', 'next', '下一页', 'next question']):
                             return btn
             except Exception as e:
-                error_msg = str(e)
-                print(f"操作失败: {error_msg[:50]}")
-                logger.error(f"详细错误: {error_msg}", exc_info=True)
+                log_failure("操作失败: ", e)
                 continue
 
         try:
@@ -10969,7 +10983,7 @@ class AISolver:
                 if any(k in text for k in ['下一题', 'next question', '下一页', 'next']):
                     if 'submit' not in text and '提交' not in text:
                         return btn
-        except:
+        except Exception:
             pass
 
         return None
@@ -10987,7 +11001,7 @@ class AISolver:
                 text = direction_elem.text.strip()
                 if text:
                     return hashlib.md5(text.encode()).hexdigest()[:16]
-        except:
+        except Exception:
             pass
         return "empty"
 
@@ -11013,18 +11027,19 @@ class AISolver:
             return hashlib.md5(body.encode()).hexdigest()[:16]
 
         except Exception as e:
-            error_msg = str(e)
-            print(f"    生成哈希失败:{error_msg[:50]} ")
-            logger.error(f"详细错误: {error_msg}", exc_info=True)
+            log_failure("    生成哈希失败:", e)
             return "empty"
 
-    def _get_level1_tabs(self) -> List[Dict]:
-        tabs = []
-        elements = WebDriverHelper.safe_find_elements(self.driver, Selectors.LEVEL1_TABS)
+    def _collect_tabs(self, elements, prefer_title_attr: bool) -> List[Dict]:
+        """把 tab 元素整理成去重后的 {'element', 'title', 'is_active'} 列表。"""
+        tabs: List[Dict] = []
         seen = set()
         for elem in elements:
             try:
-                title = elem.get_attribute('title') or elem.text.strip().split('\n')[0]
+                if prefer_title_attr:
+                    title = elem.get_attribute('title') or elem.text.strip().split('\n')[0]
+                else:
+                    title = elem.text.strip().split('\n')[0]
                 if title and title not in seen and len(title) < 50:
                     seen.add(title)
                     tabs.append({
@@ -11032,37 +11047,27 @@ class AISolver:
                         'title': title,
                         'is_active': 'activity' in (elem.get_attribute('class') or '').lower()
                     })
-            except:
+            except Exception:
                 continue
         return tabs
 
+    def _get_level1_tabs(self) -> List[Dict]:
+        elements = WebDriverHelper.safe_find_elements(self.driver, Selectors.LEVEL1_TABS)
+        return self._collect_tabs(elements, prefer_title_attr=True)
+
     def _get_level2_tabs(self) -> List[Dict]:
-        tabs = []
         container = WebDriverHelper.safe_find_element(
             self.driver,
             ['.pc-header-tasks-container', '.pc-header-tasks-layout']
         )
         if not container:
-            return tabs
+            return []
         elements = WebDriverHelper.safe_find_elements(
             self.driver,
             Selectors.LEVEL2_TABS,
             parent=container
         )
-        seen = set()
-        for elem in elements:
-            try:
-                title = elem.text.strip().split('\n')[0]
-                if title and title not in seen and len(title) < 50:
-                    seen.add(title)
-                    tabs.append({
-                        'element': elem,
-                        'title': title,
-                        'is_active': 'activity' in (elem.get_attribute('class') or '').lower()
-                    })
-            except:
-                continue
-        return tabs
+        return self._collect_tabs(elements, prefer_title_attr=False)
 
     def _extract_passage(self) -> str:
         selectors = [
@@ -11081,7 +11086,7 @@ class AISolver:
                     text = elem.text.strip()
                     if len(text) > 200:
                         return text
-            except:
+            except Exception:
                 continue
 
         return ""
@@ -11099,7 +11104,7 @@ class AISolver:
                         if self.stop_requested.wait(1):
                             return False
                         return True
-        except:
+        except Exception:
             pass
         return False
 
@@ -11156,17 +11161,13 @@ class AISolver:
             if audio_containers:
                 return True
 
-            try:
-                direction = self.driver.find_element(By.CSS_SELECTOR, '.layout-direction-container, .abs-direction')
-                text = direction.text.lower()
-                if any(kw in text for kw in ['listen', 'audio', 'hear', 'talk', 'conversation']):
-                    if self._extract_audio_url_from_page():
-                        return True
-            except:
-                pass
+            text = read_direction_text(self.driver)
+            if any(kw in text for kw in ['listen', 'audio', 'hear', 'talk', 'conversation']):
+                if self._extract_audio_url_from_page():
+                    return True
 
             return False
-        except:
+        except Exception:
             return False
 
     def _extract_audio_url_from_page(self) -> Optional[str]:
@@ -11184,7 +11185,7 @@ class AISolver:
                     return src.split('#')[0]
 
             return None
-        except:
+        except Exception:
             return None
 
     def _preprocess_video_if_needed(self, tab_name: str, l1_idx: int, l2_idx: int):
@@ -11224,7 +11225,7 @@ class AISolver:
         try:
             videos = self.driver.find_elements(By.TAG_NAME, 'video')
             return any(v.is_displayed() for v in videos)
-        except:
+        except Exception:
             return False
 
     def _wait_for_submit_complete(self, timeout: int = 8):
@@ -11242,15 +11243,15 @@ class AISolver:
             try:
                 submit_btn = self._find_visible_submit_button()
                 if submit_btn is None:
-                    print(f"   提交按钮已消失，提交完成")
+                    print("   提交按钮已消失，提交完成")
                     return
 
                 body_text = self.driver.find_element(By.TAG_NAME, 'body').text[:500].lower()
                 if any(kw in body_text for kw in ['提交成功', '保存成功', 'success', '已提交', 'submitted']):
-                    print(f"   检测到成功提示")
+                    print("   检测到成功提示")
                     return
 
-            except:
+            except Exception:
                 pass
 
             if self.stop_requested.wait(0.5):
@@ -11275,7 +11276,7 @@ class AISolver:
                 for elem in elems:
                     if elem.is_displayed() and AnswerExecutor._is_submit_button(elem):
                         return elem
-            except:
+            except Exception:
                 continue
 
         return None
@@ -11299,7 +11300,7 @@ class AISolver:
             if self.stop_requested.wait(check_interval):
                 return False
 
-        print(f"         等待内容变化超时")
+        print("         等待内容变化超时")
         return False
 
 

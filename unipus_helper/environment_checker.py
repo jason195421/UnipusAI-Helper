@@ -9,9 +9,9 @@ import urllib.request
 from typing import Optional, List
 
 try:
-    from .ffmpeg_runtime import ensure_ffmpeg_on_path, bundled_ffmpeg_dir
+    from .ffmpeg_runtime import ensure_ffmpeg_on_path
 except ImportError:  # 允许把本文件当独立脚本调试
-    from unipus_helper.ffmpeg_runtime import ensure_ffmpeg_on_path, bundled_ffmpeg_dir
+    from unipus_helper.ffmpeg_runtime import ensure_ffmpeg_on_path
 
 
 class EnvironmentChecker:
@@ -160,7 +160,7 @@ class EnvironmentChecker:
             first_line = result.stdout.split('\n')[0]
             version = first_line.split()[2] if len(first_line.split()) > 2 else "未知版本"
             return version
-        except:
+        except Exception:
             return "未知版本"
 
     def _resolve_ffprobe_path(self, ffmpeg_path: str, prefer_path_lookup: bool = False) -> Optional[str]:
@@ -288,7 +288,7 @@ class EnvironmentChecker:
             # 清理下载文件
             try:
                 os.remove(zip_path)
-            except:
+            except Exception:
                 pass
 
             print("\n  请重新运行本程序以加载新的环境变量")
@@ -309,7 +309,7 @@ class EnvironmentChecker:
         # 找到 bin 目录
         bin_dir = os.path.dirname(self.ffmpeg_path)
 
-        print(f"\n 正在添加到系统 PATH...")
+        print("\n 正在添加到系统 PATH...")
         print(f"   路径: {bin_dir}")
 
         try:
@@ -347,7 +347,7 @@ class EnvironmentChecker:
 
         try:
             current_path, _ = winreg.QueryValueEx(key, "Path")
-        except:
+        except Exception:
             current_path = ""
 
         # 检查是否已存在
@@ -391,7 +391,7 @@ class EnvironmentChecker:
         try:
             installer_path = os.path.join(tempfile.gettempdir(), "EdgeSetup.exe")
             urllib.request.urlretrieve(self.EDGE_DOWNLOAD_URL, installer_path)
-            print(f"    下载完成")
+            print("    下载完成")
             print("    启动安装程序...")
             subprocess.Popen([installer_path], shell=True)
             print("\n  请完成 Edge 安装后，重新运行本程序")
