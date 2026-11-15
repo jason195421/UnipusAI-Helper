@@ -59,6 +59,11 @@ jobs:
             --registry https://registry.npmjs.org
           file ffmpeg/${{ matrix.platform_id }}/ffmpeg ffmpeg/${{ matrix.platform_id }}/ffprobe
 
+      - name: Fetch bundled Whisper model (base)
+        run: |
+          python scripts/fetch_whisper.py
+          test -f whisper_models/base.pt || (echo "::error::base.pt missing" && exit 1)
+
       - name: Build ${{ matrix.mode }} variant + DMG
         run: |
           python scripts/build_variant.py --mode "${{ matrix.mode }}"
@@ -88,9 +93,10 @@ jobs:
               ~/Library/Application Support/UnipusAI-Helper/
           so the .app bundle itself stays read-only.
 
-          FFmpeg / ffprobe are bundled; no Homebrew or network download is
-          needed for speech recognition. Voice features also need Microsoft
-          Edge, which the built-in environment check helps you install.
+          FFmpeg / ffprobe and the Whisper "base" model are bundled; no
+          Homebrew or network download is needed for speech recognition,
+          even on the first run. Voice features also need Microsoft Edge,
+          which the built-in environment check helps you install.
           EOF
 
       - name: Smoke test (offscreen, non-fatal)

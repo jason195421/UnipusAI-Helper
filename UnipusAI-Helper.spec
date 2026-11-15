@@ -75,6 +75,16 @@ if os.path.isdir(_ffmpeg_dir):
 else:
     print('[spec] WARNING: 未找到 ' + _ffmpeg_dir + '，请先运行 scripts/fetch_ffmpeg.py --platform ' + _ffmpeg_id)
 
+# 内置 Whisper 模型权重：whisper_models/base.pt 由 scripts/fetch_whisper.py
+# 在构建前准备（复用本机 whisper 缓存或从官方镜像下载），随 _MEIPASS 发布。
+# 运行时 unipus_helper.whisper_runtime 定位该目录并作为 download_root 传给
+# whisper.load_model，文件 SHA256 与官方 URL 内嵌校验值一致，首次识别零联网。
+_whisper_models_dir = 'whisper_models'
+if os.path.isfile(os.path.join(_whisper_models_dir, 'base.pt')):
+    datas.append((_whisper_models_dir, _whisper_models_dir))
+else:
+    print('[spec] WARNING: 未找到 whisper_models/base.pt，请先运行 scripts/fetch_whisper.py')
+
 hiddenimports = collect_submodules('unipus_helper')
 # selenium 4.x 在 selenium/webdriver/__init__.py 用 __getattr__ + importlib.import_module
 # 懒加载 webdriver.EdgeOptions / Edge / ActionChains / Keys 等（第 92-103 行），

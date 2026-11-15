@@ -10,6 +10,8 @@ UnipusAI-Helper v3.9.10 — Windows 安装版 / 便携版
   * 安装向导全面中文化，欢迎页显示「欢迎安装 UnipusAI-Helper-NEXT」，
     并采用 WinUI 3 / Fluent 风格（Segoe UI 字体、Mica 浅色背景、蓝色强调
     标题、圆角按钮与自定义向导插图 / 图标）。
+  * 内置 Whisper base 模型权重（whisper_models/base.pt，约 145 MB），首次语音
+    识别无需联网下载模型；FFmpeg 与 Whisper 均随安装包 / 便携版一起发布。
 
 版本区别
 --------
@@ -35,6 +37,7 @@ UnipusAI-Helper v3.9.10 — Windows 安装版 / 便携版
   config.json            运行配置（首次已附带空模板）
   _internal/             运行所需依赖库（请勿删除或改名）
                          其中 _internal/ffmpeg/win32-x64/ 为内置 FFmpeg 二进制
+                         其中 _internal/whisper_models/base.pt 为内置 Whisper base 权重
   logs/                  运行日志；release 版的控制台输出也写在这里
   _发布说明_READ_ME_FIRST.txt  本文件
 
@@ -49,6 +52,9 @@ UnipusAI-Helper v3.9.10 — Windows 安装版 / 便携版
 4. 语音识别所需的 FFmpeg 已内置，启动时自动加入 PATH；环境自检会打印
    「使用内置 FFmpeg: ...\ffmpeg\win32-x64」。仅当内置文件被误删时，才会提示
    原有的下载 / 手动指定兜底选项。
+   Whisper 的 base 模型权重同样已内置，启动时作为 download_root 传给
+   whisper.load_model，首次识别无需联网下载约 145 MB 模型；仅当内置文件缺失时
+   才回退到 whisper 默认的联网下载 / 用户缓存。
 5. GUI（release）模式下交互式的环境检查菜单会自动跳过，缺项只记录到日志并继续，
    不会因为没有终端输入而卡住；需要逐项排查时改用 debug 版。
 
@@ -57,6 +63,7 @@ UnipusAI-Helper v3.9.10 — Windows 安装版 / 便携版
   * Windows 10/11 64 位
   * Microsoft Edge 浏览器（用于 Selenium 自动化）
   * FFmpeg：已内置，无需额外安装
+  * Whisper base 模型：已内置，首次识别无需联网下载模型
   * 网络可访问 Unipus 平台与所配置的 AI API
   * 首次启动会由 Selenium Manager 自动匹配并下载与 Edge 版本对应的
     msedgedriver（缓存在 logs/selenium_cache/）；该步骤需要联网。
@@ -89,12 +96,15 @@ UnipusAI-Helper v3.9.10 — Windows 安装版 / 便携版
     应用 Fluent 字体 / 配色与圆角按钮。这些文件需纳入版本控制，CI 才会生效。
   * 构建前先准备内置 FFmpeg：
       .venv\Scripts\python.exe scripts/fetch_ffmpeg.py --platform win32-x64
+     再准备内置 Whisper 权重（复用本机 ~/.cache/whisper 或从官方镜像下载并校验）：
+       .venv\Scripts\python.exe scripts/fetch_whisper.py
     一键构建（组装 payload、校验结构、调用 ISCC.exe 出安装包并打便携 zip）：
       .venv\Scripts\python.exe scripts/build_variant.py --mode release
       .venv\Scripts\python.exe scripts/build_variant.py --mode debug
     冒烟测试：.venv\Scripts\python.exe scripts/smoke_test.py --mode release
   * 已验证：两种版本均可 offscreen 启动、QML 设置页正常加载、release 无终端且
-    标准输出重定向到日志、内置 FFmpeg 命中 PATH、安装包与便携 zip 结构完整。
+    标准输出重定向到日志、内置 FFmpeg 命中 PATH、内置 Whisper base.pt 随
+    payload 发布且离线 load_model 直命中本地文件、安装包与便携 zip 结构完整。
   * GitHub Actions：.github/workflows/build-windows.yml 在 windows-2022 上按
     debug/release 矩阵构建并发布；打 v* 标签时自动上传 Setup.exe 与便携 zip。
   * 本机若出现 Selenium Manager 联网失败（无法获取 msedgedriver），

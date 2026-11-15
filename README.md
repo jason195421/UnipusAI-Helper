@@ -229,6 +229,10 @@ Aqua 风格；同一套 Qt Quick / QML 界面按平台自动切换配色、圆�
 - **双平台 GitHub Actions**：新增 `.github/workflows/build-windows.yml`（`windows-2022`，
   choco 安装 Inno Setup，debug × release 矩阵）；`build-macos.yml` 改为 arm64 / x64 ×
   debug / release 四组并产出 DMG。两者均在 `v*` 标签时发布到 GitHub Release。
+- **内置 Whisper 模型**：`whisper_models/base.pt`（base，约 145 MB）随安装包 / 便携版
+  发布；`scripts/fetch_whisper.py` 在构建前复用本机 whisper 缓存或从官方镜像下载并
+  校验 SHA256，运行时 `unipus_helper/whisper_runtime.py` 定位内置目录并作为
+  `download_root` 传给 `whisper.load_model`，首次语音识别无需联网下载模型权重。
 
 </details>
 

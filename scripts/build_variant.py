@@ -117,6 +117,9 @@ def verify_payload(mode, payload):
             problems.append("missing bundled " + ff)
         if sys.platform == "win32" and not (payload / "config.json").is_file():
             problems.append("missing config.json template")
+    # 内置 Whisper 权重必须随 payload 发布（首次语音识别零联网）。
+    if not list(payload.rglob("whisper_models/base.pt")):
+        problems.append("missing bundled whisper_models/base.pt")
     if problems:
         for p in problems:
             log("VERIFY FAIL: " + p)

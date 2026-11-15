@@ -49,6 +49,12 @@ jobs:
           if (-not (Test-Path ffmpeg/win32-x64/ffmpeg.exe)) { throw "ffmpeg.exe missing" }
           if (-not (Test-Path ffmpeg/win32-x64/ffprobe.exe)) { throw "ffprobe.exe missing" }
 
+      - name: Fetch bundled Whisper model (base)
+        shell: pwsh
+        run: |
+          python scripts/fetch_whisper.py
+          if (-not (Test-Path whisper_models/base.pt)) { throw "base.pt missing" }
+
       - name: Install Inno Setup 6
         shell: pwsh
         run: |

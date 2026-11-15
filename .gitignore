@@ -28,6 +28,9 @@ unipus-workbench-*/
 # 内置 FFmpeg 二进制（由 scripts/fetch_ffmpeg.py 下载生成，体积大不进版本库；只保留说明）
 ffmpeg/*
 !ffmpeg/README.md
+# 内置 Whisper 模型权重（由 scripts/fetch_whisper.py 生成或复用缓存，体积大不进版本库；只保留说明）
+whisper_models/*
+!whisper_models/README.md
 
 # Build toolchains / installer outputs
 .tools/
