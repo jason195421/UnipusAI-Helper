@@ -43,8 +43,8 @@ class TaskListModel(QAbstractListModel):
         super().__init__(parent)
         self.rows = []
 
-    def rowCount(self, parent=QModelIndex()):
-        return 0 if parent.isValid() else len(self.rows)
+    def rowCount(self, parent=None):
+        return 0 if (parent is not None and parent.isValid()) else len(self.rows)
 
     def roleNames(self):
         return self.roles
@@ -254,7 +254,7 @@ class NativeBridge(QObject):
         selected_visible = sum(t["selected"] for t in visible)
         self._summary = {
             "counts": counts, "visible": len(visible), "selected": len(selected),
-            "selectedUnits": len(set(t["unit"] for t in selected)),
+            "selectedUnits": len({t["unit"] for t in selected}),
             "selectableVisible": len(selectable),
             "selectedVisible": selected_visible, "selectedHidden": len(selected) - selected_visible,
             "allChecked": bool(selectable) and all(t["selected"] for t in selectable),

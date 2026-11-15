@@ -84,7 +84,7 @@ hiddenimports += collect_submodules('selenium')
 hiddenimports += [
     'PySide6.QtCore', 'PySide6.QtGui', 'PySide6.QtQml',
     'PySide6.QtQuick', 'PySide6.QtQuickControls2', 'shiboken6',
-    'edge_tts', 'tiktoken_ext.openai_public', 'whisper',
+    'edge_tts', 'tiktoken_ext.openai_public', 'whisper', 'openai',
 ]
 # winreg / winsound only exist on Windows; keep them platform-gated.
 if _sys.platform == 'win32':
