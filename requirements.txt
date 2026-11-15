@@ -1,11 +1,8 @@
 selenium>=4.10.0
 openai>=1.10.0
 openai-whisper>=20231117
-# 以下两项仅供旧版独立配置编辑器 config_editor.py 使用（源码保留，已不再发布）；
-# 主程序内置设置页只依赖 PySide6-Essentials，默认无需安装。
-# 如需单独运行旧编辑器，请手动取消注释安装：
-# PyQt5>=5.15.11
-# PyQt-Fluent-Widgets>=1.0.0
+# 配置编辑已统一为 PySide6 / Qt Quick：主程序内置「设置」页与独立
+# config_editor.py 共用 PySide6-Essentials，无需 PyQt5 / Fluent Widgets。
 # 录音题（Exercise 2 主观题）TTS 主后端；没装会回退到 Windows 自带 System.Speech
 edge-tts>=7.3.1
 # Native Qt Quick interface. Essentials includes QML/Quick/Controls without WebEngine.

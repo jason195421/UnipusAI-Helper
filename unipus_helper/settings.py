@@ -31,11 +31,13 @@ DEFAULT_CONFIG = {
     "tts_engine": "auto",   # auto / edge / sapi / off
     "tts_voice": "",
     "tts_proxy": "",
+    # 浏览器后端：edge（默认）/ chrome，见 unipus_helper/browser.py
+    "browser": "edge",
 }
 
 STRING_FIELDS = (
     "username", "password", "url", "token_full", "api_key", "base_url",
-    "model", "tts_engine", "tts_voice", "tts_proxy",
+    "model", "tts_engine", "tts_voice", "tts_proxy", "browser",
 )
 
 

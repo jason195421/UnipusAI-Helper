@@ -26,6 +26,7 @@ Rectangle {
         ttsEngineField.text = String(c.tts_engine || "auto")
         ttsVoiceField.text = String(c.tts_voice || "")
         ttsProxyField.text = String(c.tts_proxy || "")
+        browserField.text = String(c.browser || "edge")
         tokenField.text = String(c.token_full || "")
         debugCheck.checked = !!c.debug_mode
     }
@@ -44,7 +45,8 @@ Rectangle {
             "debug_mode": debugCheck.checked,
             "tts_engine": ttsEngineField.text,
             "tts_voice": ttsVoiceField.text,
-            "tts_proxy": ttsProxyField.text
+            "tts_proxy": ttsProxyField.text,
+            "browser": browserField.text
         })
         statusText.text = ok
             ? (page.firstRun ? "配置已保存，窗口即将关闭，请重新启动程序。"
@@ -137,8 +139,14 @@ Rectangle {
                     ConfigField { id: temperatureField; objectName: "cfg_temperature"; placeholderText: "0.3" }
                 }
 
-                UiText { text: "录音题与高级"; font.pixelSize: 15; font.weight: Font.DemiBold; color: Theme.accent; Layout.fillWidth: true; Layout.topMargin: 10 }
+                UiText { text: "录音题、浏览器与高级"; font.pixelSize: 15; font.weight: Font.DemiBold; color: Theme.accent; Layout.fillWidth: true; Layout.topMargin: 10 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 16
+                    UiText { text: "浏览器"; Layout.preferredWidth: 128; color: Theme.secondary; font.pixelSize: 13 }
+                    ConfigField { id: browserField; objectName: "cfg_browser"; placeholderText: "edge（默认）/ chrome" }
+                }
 
                 RowLayout {
                     Layout.fillWidth: true; spacing: 16

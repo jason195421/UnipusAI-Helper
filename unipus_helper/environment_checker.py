@@ -8,6 +8,8 @@ import zipfile
 import urllib.request
 from typing import Optional, List
 
+from .browser import BrowserSpec, DEFAULT_BROWSER, get_spec
+
 try:
     from .ffmpeg_runtime import ensure_ffmpeg_on_path, bundled_ffmpeg_dir
 except ImportError:  # 允许把本文件当独立脚本调试
@@ -17,14 +19,15 @@ except ImportError:  # 允许把本文件当独立脚本调试
 class EnvironmentChecker:
     """环境检测器"""
 
-    EDGE_DOWNLOAD_URL = "https://go.microsoft.com/fwlink/?linkid=2108834&Channel=Stable&language=zh-cn"
     FFMPEG_DOWNLOAD_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 
-    def __init__(self):
+    def __init__(self, browser: str = DEFAULT_BROWSER):
         self.issues: List[str] = []
         self.warnings: List[str] = []
         self.ffmpeg_path: Optional[str] = None
         self.ffprobe_path: Optional[str] = None
+        # 与 driver 使用同一份规格，避免检测与实际启动的浏览器不一致
+        self.browser: BrowserSpec = get_spec(browser)
 
     def check_all(self) -> bool:
         """执行完整环境检查"""
@@ -33,8 +36,8 @@ class EnvironmentChecker:
         # 检查系统
         self._check_system()
 
-        # 检查 Edge 浏览器
-        self._check_edge_browser()
+        # 检查浏览器
+        self._check_browser()
 
         # 检查 FFmpeg（新增）
         self._check_ffmpeg()
@@ -69,30 +72,21 @@ class EnvironmentChecker:
         print(f"   Python: {platform.python_version()}")
 
         if platform.system() not in ("Windows", "Darwin"):
-            self.warnings.append("非 Windows / macOS 系统，可能无法正常使用 Edge")
+            self.warnings.append(
+                f"非 Windows / macOS 系统，可能无法正常使用 {self.browser.display_name}")
 
-    def _check_edge_browser(self):
-        """检查 Edge 浏览器"""
-        possible_paths = [
-            r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
-            r'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
-            os.path.expandvars(r'%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe'),
-            os.path.expandvars(r'%PROGRAMFILES%\Microsoft\Edge\Application\msedge.exe'),
-            os.path.expandvars(r'%PROGRAMFILES(X86)%\Microsoft\Edge\Application\msedge.exe'),
-            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-            os.path.expanduser('~/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
-        ]
-        for name in ('msedge', 'microsoft-edge', 'microsoft-edge-stable'):
-            found = shutil.which(name)
-            if found:
-                possible_paths.append(found)
+    def _check_browser(self):
+        """检查配置指定的浏览器是否已安装。"""
+        path = self.browser.detect_install_path()
+        if path:
+            print(f"    {self.browser.display_name}: {path}")
+            return
 
-        for path in possible_paths:
-            if os.path.exists(path):
-                print(f"    Edge 浏览器: {path}")
-                return
+        self.issues.append(f" 未检测到 {self.browser.display_name} 浏览器")
 
-        self.issues.append(" 未检测到 Microsoft Edge 浏览器")
+        if self.browser.supports_auto_install:
+            return
+        self.issues.append("   → 请手动安装：" + " / ".join(self.browser.manual_install_hint))
 
     # ==================== 新增：FFmpeg 检测 ====================
 
@@ -183,11 +177,15 @@ class EnvironmentChecker:
 
     def show_fix_guide(self):
         """显示修复指南"""
+        install_option = (f"自动下载并安装 {self.browser.display_name} 浏览器"
+                          if self.browser.supports_auto_install
+                          else f"查看 {self.browser.display_name} 手动安装说明")
+
         print("\n" + "=" * 60)
         print(" 自动修复选项")
         print("=" * 60)
         print("\n请选择操作：")
-        print("   [1] 自动下载并安装 Edge 浏览器")
+        print(f"   [1] {install_option}")
         print("   [2] 重新下载安装 FFmpeg（内置缺失时的兜底，一般无需）")
         print("   [3] 将系统 FFmpeg 添加到 PATH（一般无需）")
         print("   [4] 手动指定 FFmpeg 路径（一般无需）")
@@ -196,9 +194,10 @@ class EnvironmentChecker:
         print("\n   提示：FFmpeg 已随程序内置，正常情况下无需联网下载或手动安装。")
         if platform.system() != "Windows":
             print("\n   macOS / Linux 提示：下面 [1][2][3] 是 Windows 专用流程，")
-            print("   Edge 建议用包管理器安装；FFmpeg 已内置，一般无需处理：")
-            print("     macOS   brew install --cask microsoft-edge")
-            print("     Ubuntu  Edge 请去官网下 .deb；apt install ffmpeg 仅作兜底")
+            print("   建议用包管理器安装浏览器，装完重跑本程序即可；FFmpeg 已内置，一般无需处理：")
+            if self.browser.macos_package:
+                print(f"     macOS   brew install --cask {self.browser.macos_package}")
+            print("     Ubuntu  浏览器请去官网下 .deb；apt install ffmpeg 仅作兜底")
 
         choice = input("\n请输入选项 (1/2/3/4/5/Q): ").strip().upper()
         return choice
@@ -381,20 +380,30 @@ class EnvironmentChecker:
 
     # ==================== 其他修复选项（保持原有）====================
 
-    def auto_install_edge(self) -> bool:
-        """自动安装 Edge"""
+    def auto_install_browser(self) -> bool:
+        """按浏览器规格下载安装程序；不支持自动安装时只打印手动安装指引。"""
+        if not self.browser.installer_url:
+            print(f"\n  {self.browser.display_name} 需要手动安装：")
+            for hint in self.browser.manual_install_hint:
+                print(f"     {hint}")
+            print("   安装完成后重新运行本程序即可。")
+            return False
+
         if platform.system() != "Windows":
             print("\n  当前系统不是 Windows，这里下载的是 Windows 安装包，改用包管理器：")
-            print("     macOS: brew install --cask microsoft-edge")
+            if self.browser.macos_package:
+                print(f"     macOS: brew install --cask {self.browser.macos_package}")
             return False
-        print("\n 正在下载 Edge 浏览器安装程序...")
+
+        print(f"\n 正在下载 {self.browser.display_name} 安装程序...")
         try:
-            installer_path = os.path.join(tempfile.gettempdir(), "EdgeSetup.exe")
-            urllib.request.urlretrieve(self.EDGE_DOWNLOAD_URL, installer_path)
+            installer_name = f"{self.browser.key.title()}Setup.exe"
+            installer_path = os.path.join(tempfile.gettempdir(), installer_name)
+            urllib.request.urlretrieve(self.browser.installer_url, installer_path)
             print(f"    下载完成")
             print("    启动安装程序...")
             subprocess.Popen([installer_path], shell=True)
-            print("\n  请完成 Edge 安装后，重新运行本程序")
+            print(f"\n  请完成 {self.browser.display_name} 安装后，重新运行本程序")
             input("按回车键退出...")
             return False
         except Exception as e:
