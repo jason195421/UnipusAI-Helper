@@ -1,3 +1,4 @@
+import gc
 import tempfile
 import os
 import traceback
@@ -14,7 +15,6 @@ class AudioTranscriber:
     def __init__(self):
         self.local_model = None
         self._transcript_cache: Dict[str, str] = {}
-        self._init_local_model()
 
     @staticmethod
     def _print_exception(prefix: str, exc: Exception) -> None:
@@ -25,12 +25,13 @@ class AudioTranscriber:
             print(tb)
 
     def _init_local_model(self):
-        """初始化本地 Whisper 模型（构造 AudioTranscriber 时加载）。
+        """初始化本地 Whisper 模型（进到需要转写的页面才导入，省启动开销）。
 
         优先加载随安装包内置的 whisper_models/base.pt（零联网）；仅在内置
         文件缺失时才回退到 whisper 默认的联网下载 / 用户缓存行为。
         """
         try:
+            # 进到需要转写的页面才导入，省掉整轮只播放的练习里的启动开销
             import whisper
             from . import whisper_runtime
         except ImportError:
@@ -52,6 +53,24 @@ class AudioTranscriber:
             self._print_exception("       加载本地模型失败", e)
             raise
 
+    def _ensure_local_model(self) -> bool:
+        """真要转写时才加载模型。"""
+        if self.local_model is not None:
+            return True
+        try:
+            self._init_local_model()
+        except Exception:
+            return False
+        return self.local_model is not None
+
+    def release_local_model(self) -> None:
+        """释放本地模型，下次要转写时再加载。"""
+        if self.local_model is None:
+            return
+        self.local_model = None
+        gc.collect()
+        print("       已释放 Whisper 模型")
+
     def transcribe(self, audio_url: str, language: str = "en") -> str:
         """
         下载音频并转录为文字
@@ -71,6 +90,8 @@ class AudioTranscriber:
         audio_path = None
 
         try:
+            if not self._ensure_local_model():
+                return ""
             print("      【下载】获取音频...")
             with urllib.request.urlopen(audio_url, timeout=30) as response, \
                     tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
