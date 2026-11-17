@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  基于 Selenium、PySide6 / QML 与 OpenAI 兼容接口的 U 校园 AI 版刷课工具
+  基于 UnipusAI-Helper为上游的，加上了易用的图形化界面，使其易用，本地化了方法，本项目部代码由AI贡献
 </p>
 
 <p align="center">  
