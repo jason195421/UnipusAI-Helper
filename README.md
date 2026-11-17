@@ -1,5 +1,5 @@
 <div align="center">
-     <h2>UnipusAI-Helper next
+     <h2>UnipusAI-Helper next </h2>
 
 <p align="center">
   <img src="docs/images/1.png" alt="UnipusAI-Helper" width="900" />
