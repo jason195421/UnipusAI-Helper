@@ -1169,6 +1169,7 @@ class QuestionParser:
     def __init__(self, driver):
         self.driver = driver
         self.strategies: List[QuestionParserStrategy] = [
+            RolePlayStrategy(),
             ParagraphMatchingStrategy(),  # 段落信息匹配：条件最独特，放最前避免被通用策略抢走
             VocabularyReadAloudStrategy(),  # 词汇跟读卡片：优先于 RecordStrategy
             OralAloudStrategy(),  # 整段朗读题：靠 .p-oral-aloud 判定
@@ -1372,6 +1373,12 @@ class QuestionParser:
         if self._is_discussion_board_page():
             print("     检测到讨论板页面，跳过")
             return []
+
+        role_play = [c for c in self.driver.find_elements(
+            By.CSS_SELECTOR, '.layoutBody-container')
+                     if c.is_displayed() and c.find_elements(By.CSS_SELECTOR, '.role-play-wrapper')]
+        if role_play:
+            return role_play
 
         # New words / Phrases and expressions 词汇跟读卡片：结构独特，必须优先于
         # _find_record_containers()，否则会被 .button-record 兜底选择器收成录音题。
@@ -1633,6 +1640,16 @@ class QuestionParser:
                 continue
         print(f"      没有匹配的策略")
         return None
+
+
+class RolePlayStrategy(QuestionParserStrategy):
+    def can_parse(self, container, driver) -> bool:
+        return bool(container.find_elements(By.CSS_SELECTOR, '.role-play-wrapper'))
+
+    def parse(self, container, driver, question_number: int, directions: str = "") -> Optional[Question]:
+        return Question(number=question_number, text=directions or '角色扮演录音',
+                        q_type=QuestionType.RECORD, element=container, directions=directions,
+                        record_items=[{'role_play': True, 'text': '角色扮演'}])
 
 
 class DiscussionBoardStrategy(QuestionParserStrategy):
@@ -2437,6 +2454,9 @@ return Array.from(arguments[1]).map(function (button) {
   const wrap = button.closest('.record-button-wrap');
   const paragraph = button.closest('.oral-paragraph-container');
   const group = button.closest('.record-button-group');
+  // 口语回答这类题（oral-personal-state）：题干在 oral-container 里，
+  // 录音区里只有倒计时和「点击按钮，结束录音」提示，不能拿来当题名。
+  const oralBox = button.closest('.oral-personal-state-wrapper');
   const row = button.closest('.oral-study-sentence') || paragraph || root;
   let audio = null;
   for (const scope of [paragraph, group, row]) {
@@ -2458,17 +2478,27 @@ return Array.from(arguments[1]).map(function (button) {
     if (passage) { break; }
   }
   const text = passage ? oneLine(passage.innerText || passage.textContent || '') : '';
+  // 口语题的问题题干只能当题名/签名。写进 text 会优先于 AI 稿件被当成“朗读原文”。
+  const promptBox = oralBox ? oralBox.querySelector('.oral-personal-state-oral-container') : null;
+  const promptText = promptBox
+    ? oneLine(promptBox.innerText || promptBox.textContent || '') : '';
   let lines = [];
   if (row) {
     lines = (row.innerText || '').split(String.fromCharCode(10))
       .map(function (part) { return tidy(part); })
-      .filter(function (part) { return part.length > 0; });
+      // 倒计时与录音提示不是题名，拾到会把“03:00”当成题干。
+      .filter(function (part) {
+        return part.length > 0 && !/^\d{1,2}:\d{2}$/.test(part) &&
+          part.indexOf('点击按钮') === -1 && part.indexOf('结束录音') === -1;
+      });
   }
   const rows = Array.from(document.querySelectorAll('.oral-study-sentence'));
   return {
     raw: raw,
-    name: text || (lines.length ? lines[0] : ''),
+    name: text || promptText || (lines.length ? lines[0] : ''),
     text: text,
+    // 单独给出稳定题干，供签名使用：name 末位可能是播放器状态文案。
+    prompt: promptText,
     lines: lines.slice(0, 4),
     src: song ? (song.getAttribute('title') || '') : '',
     rowIndex: rows.indexOf(row)
@@ -2990,6 +3020,7 @@ class RecordStrategy(QuestionParserStrategy):
                 lines = [str(line).strip() for line in (info.get('lines') or []) if str(line).strip()]
                 meta['lines'] = lines
                 meta['text'] = (info.get('text') or '').strip()
+                meta['prompt'] = (info.get('prompt') or '').strip()
                 # 记下行号，按钮被 React 换掉后按行重定位。
                 try:
                     row_index = int(info.get('rowIndex'))
@@ -4905,7 +4936,7 @@ class PromptBuilder:
             lines.append("My voice文字作答: 1.英文介绍内容（500字符以内）")
 
         if QuestionType.SORTING in type_counts:
-            lines.append("排序题: 直接返回排序后的字母，如：B E A D C F")
+            lines.append("排序题: 按题号返回排序后的字母，如：1.B E A D C F")
 
         if QuestionType.MATCHING in type_counts:
             lines.append("匹配题: 每空一个字母，格式：1.B 2.A 3.F（不要写单词）")
@@ -5064,6 +5095,9 @@ class AnswerExecutor:
         if not valid:
             return []
 
+        single_answer = re.fullmatch(r'\s*\d+\s*[.、:：)\]]\s*([A-Z][A-Z\s,，、;；>→-]*)\s*', answer.upper())
+        if single_answer:
+            answer = single_answer.group(1)
         numbered = re.findall(r'\d+\s*[.、)\]]\s*([A-Z])\b', answer.upper())
         candidates = numbered if numbered else re.findall(r'\b([A-Z])\b', answer.upper())
 
@@ -5442,6 +5476,8 @@ class AnswerExecutor:
         if not items:
             print("\t没有找到录音条目")
             return False
+        if items[0].get('role_play'):
+            return self._answer_role_play(q)
         if items[0].get('vocab'):
             return self._answer_vocabulary_read_aloud(q)
 
@@ -5957,6 +5993,105 @@ class AnswerExecutor:
                 continue
             time.sleep(0.5)
         return None
+
+    def _answer_role_play(self, q: Question) -> bool:
+        self._dismiss_record_popup()
+        roles = [e for e in q.element.find_elements(By.CSS_SELECTOR, '.role-list label.label')
+                 if e.is_displayed()]
+        if roles and not WebDriverHelper.safe_click(self.driver, roles[0]):
+            return False
+        try:
+            WebDriverWait(self.driver, 10).until(
+                lambda d: any(e.is_displayed() for e in q.element.find_elements(
+                    By.CSS_SELECTOR, '.role-reply .record-seat')))
+            info = self.driver.execute_script("""
+                const row = arguments[0].querySelector('.role-reply .list-item-review');
+                if (!row) return null;
+                let fiber = row[Object.keys(row).find(k => k.startsWith('__reactFiber'))];
+                while (fiber && !(fiber.memoizedProps || {}).question) fiber = fiber.return;
+                const question = fiber && fiber.memoizedProps.question;
+                const selected = arguments[0].querySelector('.role-reply .score:not(.hide)');
+                const role = selected && selected.closest('.list-item-review').querySelector('.role');
+                if (!question || !role) return null;
+                const children = question.children || [];
+                return {lines: children.filter(x => x.role && x.role.name === role.textContent.trim())
+                    .map(x => ({url: (x.contents || []).find(c => c.type === 1 && c.path)?.path || ''})),
+                    seconds: children.reduce((s, x) => s + ((x.config || {}).recordTime || 0) / 1000, 0)};
+            """, q.element)
+            if not info or not info.get('lines'):
+                print('\t无法读取角色台词')
+                return False
+            clips = []
+            for line in info['lines']:
+                data = self._download_record_audio((line.get('url') or '').split('#')[0])
+                if not data:
+                    print('\t角色台词缺少参考音频')
+                    return False
+                clips.append(base64.b64encode(data).decode())
+            prepared = self.driver.execute_async_script("""
+                const done = arguments[arguments.length - 1], api = window.__ucRec;
+                if (!api) { done(false); return; }
+                (async () => {
+                    const queue = [];
+                    for (const b64 of arguments[0]) {
+                        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                        queue.push(await api.ctxOf().decodeAudioData(bytes.buffer));
+                    }
+                    api.rolePlayStream = api.stream;
+                    api.rolePlayQueue = queue;
+                    api.stream = function () {
+                        api.buf = api.rolePlayQueue.shift() || null;
+                        return api.rolePlayStream();
+                    };
+                    done(true);
+                })().catch(() => done(false));
+            """, clips)
+            if not prepared:
+                print('\t角色台词音频初始化失败')
+                return False
+            started = False
+            try:
+                seat = q.element.find_element(By.CSS_SELECTOR, '.role-reply .record-seat')
+                if not WebDriverHelper.safe_click(self.driver, seat):
+                    return False
+                started = True
+                deadline = time.time() + max(90, min(600, info.get('seconds', 0) * 2 + 60))
+                while time.time() < deadline and not self.stop_requested.is_set():
+                    state = self.driver.execute_script("""
+                        const root = arguments[0], api = window.__ucRec;
+                        const rows = [...root.querySelectorAll('.role-play-quiz .list-item-review')];
+                        const scores = [...root.querySelectorAll('.role-play-quiz .score:not(.hide)')];
+                        const audio = root.querySelector('.role-reply audio');
+                        return {left: api.rolePlayQueue.length,
+                            scores: scores.map(x => x.textContent.trim()),
+                            finished: rows.length && rows[rows.length - 1].classList.contains('active') &&
+                                (!audio || audio.paused || audio.ended)};
+                    """, q.element)
+                    if (state['left'] == 0 and len(state['scores']) == len(clips)
+                            and all(state['scores']) and state['finished']):
+                        print(f"\t角色扮演录音完成，得分: {', '.join(state['scores'])}")
+                        started = False
+                        return True
+                    self.stop_requested.wait(0.5)
+                print('\t角色扮演录音未完成')
+                return False
+            finally:
+                if started:
+                    buttons = q.element.find_elements(By.CSS_SELECTOR, '.role-reply .pre-page-btn')
+                    if buttons:
+                        WebDriverHelper.safe_click(self.driver, buttons[0])
+                self.driver.execute_script("""
+                    const api = window.__ucRec;
+                    if (api && api.rolePlayStream) {
+                        api.stream = api.rolePlayStream;
+                        delete api.rolePlayStream;
+                        delete api.rolePlayQueue;
+                        api.buf = null;
+                    }
+                """)
+        except Exception as exc:
+            print(f'\t角色扮演处理失败: {str(exc)[:100]}')
+            return False
 
     def _download_record_audio(self, url: str) -> Optional[bytes]:
         if not url:
@@ -10511,6 +10646,8 @@ class AISolver:
                 ans = self._extract_single_answer(response, q.number)
                 if not ans:
                     ans = response
+            elif q.q_type == QuestionType.SORTING and len(questions) > 1:
+                ans = self._extract_single_answer(response, q.number)
             else:
                 ans = response
             try:
@@ -10884,6 +11021,8 @@ class AISolver:
                         elif q.q_type in [QuestionType.BANKED_CLOZE, QuestionType.FILL_IN,
                                           QuestionType.DROPDOWN_SELECT]:
                             ans = ai_response
+                        elif q.q_type == QuestionType.SORTING and len(normal_questions) > 1:
+                            ans = self._extract_single_answer(ai_response, q.number)
                         else:
                             ans = ai_response
 
@@ -10940,7 +11079,9 @@ class AISolver:
                     print(f"    点击下一题失败")
                     break
 
-                if not self._wait_for_content_change(pre_click_signature, timeout=5):
+                # 翻页后等 30 秒：录音刚结束时平台还在上传/评分，页面不会立刻切，
+                # 5 秒窗口太短（parse_all 一次约 0.7s，只够 7 次）。
+                if not self._wait_for_content_change(pre_click_signature, timeout=30):
                     if self._should_stop():
                         return False
                     print(f"    内容未变化，可能已到最后一页")
@@ -11825,7 +11966,17 @@ class AISolver:
         parts = []
         for q in questions:
             q_type = q.q_type.name if q.q_type else "UNKNOWN"
-            text_preview = q.text[:30] if q.text else ""
+            # 用完整题干。只取前 30 字时，相邻题目若共用长前缀（录音题的
+            # q.text 开头就是全任务固定的 directions），签名会相同，翻页被判成末页。
+            text_preview = re.sub(r'\s+', ' ', q.text or '').strip()
+            if q.q_type in (QuestionType.RECORD, QuestionType.ORAL_ALOUD):
+                # 录音题优先用解析出的稳定题干/朗读原文；两者都为空才退回整段题干。
+                # 不能拿 name：它的末位来源是 lines[0]，可能是播放器状态文案。
+                stable = [(item.get('prompt') or item.get('text') or '').strip()
+                          for item in (q.record_items or [])]
+                stable = [value for value in stable if value]
+                if stable:
+                    text_preview = '|'.join(stable)
             option_preview = "|".join(opt.text[:30] for opt in q.options[:4])
             page_progress = ""
             if q.q_type == QuestionType.RECORD:
