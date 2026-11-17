@@ -1,5 +1,4 @@
-<p align="center">
-**UnipusAI-Helper next** 
+# UnipusAI-Helper NEXT
 
 <p align="center">
   <img src="docs/images/1.png" alt="UnipusAI-Helper" width="900" />
